@@ -90,6 +90,19 @@
   }
   .ferrystatus:empty { display: none; }
 
+  /* Klikkbare skilt: usynlige lenkeflater lagt over skiltet i bildet (over listen, så de kan klikkes på PC) */
+  .camlink {
+    position: absolute; z-index: 3; border-radius: 4px;
+    outline: 2px solid transparent; outline-offset: 1px; transition: outline-color .15s;
+  }
+  .camlink:hover, .camlink:focus-visible { outline-color: var(--accent); }
+  .camlink[hidden] { display: none; }
+  .camlink span {
+    position: absolute; right: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 10px; line-height: 18px; text-align: center;
+    box-shadow: 0 1px 3px rgb(0 0 0 / .3);
+  }
+
   .scroller {
     grid-column: 1 / -1; grid-row: 1; z-index: 1; min-height: 0;
     overflow-y: auto; overscroll-behavior: contain; position: relative;
@@ -252,6 +265,9 @@
       </defs>
       <image class="bgimg" width="1774" height="887" filter="url(#dim)"/>
       <image class="bgimg" width="1774" height="887" mask="url(#spot)"/>
+      <!-- Skiltene i fotoet (bildekoordinater), brukt til å plassere webkamera-lenkene -->
+      <rect class="hot" data-side="l" x="200" y="332" width="115" height="44" fill="none"/>
+      <rect class="hot" data-side="r" x="1547" y="337" width="120" height="44" fill="none"/>
       <g class="ferries"></g>
     </svg>
 
@@ -287,6 +303,8 @@
   </div>
 
   <button class="tonow" id="tonow" hidden>↺ Til neste avgang</button>
+  <a class="camlink" id="camLeft" target="_blank" rel="noopener" hidden><span aria-hidden="true">📷</span></a>
+  <a class="camlink" id="camRight" target="_blank" rel="noopener" hidden><span aria-hidden="true">📷</span></a>
 </main>
 
 <script>
@@ -295,8 +313,9 @@
 /* ---------- Konfigurasjon (hardkodet i første versjon) ---------- */
 const CONFIG = {
   route: "18-538",
-  left:  { id: "NSR:StopPlace:58672", name: "Misten" },
-  right: { id: "NSR:StopPlace:62316", name: "Festvåg" },
+  // webcam: side hos Statens vegvesen med webkamera ved fergeleiet (null = ingen lenke)
+  left:  { id: "NSR:StopPlace:58672", name: "Misten", webcam: "https://www.vegvesen.no/trafikk/vaerveikamera/3001122" },
+  right: { id: "NSR:StopPlace:62316", name: "Festvåg", webcam: "https://www.vegvesen.no/trafikk/vaerveikamera/3001123" },
 };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
@@ -788,11 +807,38 @@ function setSign(id, name) {
 /* ---------- Valg av bilde (Enkel / Foto), huskes i nettleseren ---------- */
 const MODE_KEY = "fergeweb.bilde";
 
+/* ---------- Webkamera-lenker på skiltene ---------- */
+/* Lenkene ligger over listen og plasseres over skiltet i bildet som vises nå */
+function placeCamLinks() {
+  const main = document.querySelector("main").getBoundingClientRect();
+  const mode = document.getElementById("map").dataset.mode;
+  for (const [side, place, linkId, signId] of [
+    ["l", CONFIG.left, "camLeft", "signLeft"],
+    ["r", CONFIG.right, "camRight", "signRight"],
+  ]) {
+    const a = document.getElementById(linkId);
+    a.hidden = !place.webcam;
+    if (!place.webcam) continue;
+    a.href = place.webcam;
+    a.title = `Webkamera ved ${place.name} fergeleie (Statens vegvesen)`;
+    a.setAttribute("aria-label", a.title);
+    const target = mode === "simple"
+      ? document.querySelector(`#${signId} .board`)
+      : document.querySelector(`.scene[data-scene="fancy"] .hot[data-side="${side}"]`);
+    const r = target.getBoundingClientRect();
+    Object.assign(a.style, {
+      left: `${r.left - main.left}px`, top: `${r.top - main.top}px`,
+      width: `${r.width}px`, height: `${r.height}px`,
+    });
+  }
+}
+
 function setMode(mode) {
   if (!SCENES[mode]) mode = "fancy";
   document.getElementById("map").dataset.mode = mode;
   for (const b of document.querySelectorAll(".modes button")) b.setAttribute("aria-pressed", b.dataset.mode === mode);
   try { localStorage.setItem(MODE_KEY, mode); } catch {}
+  placeCamLinks();
 }
 
 function initMode() {
@@ -832,6 +878,8 @@ async function main() {
 
   setSign("signLeft", left.name);
   setSign("signRight", right.name);
+  new ResizeObserver(placeCamLinks).observe(document.getElementById("map"));
+  window.addEventListener("resize", placeCamLinks);
   initMode();
 
   const board = new Board(left, right);

@@ -21,6 +21,11 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
 - Valgknappen ligger i toppen og ikke i bildet, fordi listen ligger over bildet på PC.
 
+### Webkamera
+- Skiltene ved fergeleiene, i både enkelt bilde og foto, er lenker til Statens vegvesens webkamera ved fergeleiet. Lenken åpnes i en ny fane, og skiltet er merket med et lite kameramerke.
+- Webkamera-adressen ligger i `CONFIG` (`webcam`) for hvert fergeleie. Uten adresse blir skiltet ikke en lenke.
+- Webkameraene kan ikke finnes automatisk. Vegvesenets åpne API for webkamera (DATEX II) krever brukernavn og passord, og det kan ikke ligge i en offentlig fil. API-et som vegvesen.no selv bruker, er internt og ikke ment for andre. Adressene legges derfor inn manuelt, og ved konfigurasjon senere må de inngå i oppsettet for hvert fergeleie.
+
 ### Fergens posisjon
 - Fergen tegnes i bildet der den antas å være akkurat nå, og flyttes hvert sekund. Når den ligger ved kai, ligger den inntil fergeleiet. Under overfart går den i en bue litt nærmere betrakteren, tegnes litt større midt i fjorden, vugger svakt og har kjølvann bak seg.
 - Under en overfart flyttes den jevnt langs ruten mellom fergeleiene, fra forventet avgang til forventet ankomst. Entur gir ingen posisjonsdata, så dette er et anslag. Mangler forventet ankomst, brukes rutetid for ankomst forskjøvet med samme forsinkelse som ved avgang.
@@ -63,6 +68,7 @@ Foreløpig ligger konfigurasjonen hardkodet i `CONFIG` øverst i scriptet i `ind
 | `route` | `18-538` |
 | `left` | Misten ferjekai, `NSR:StopPlace:58672` |
 | `right` | Festvåg ferjekai, `NSR:StopPlace:62316` |
+| `webcam` | Webkamera per fergeleie. Misten: `https://www.vegvesen.no/trafikk/vaerveikamera/3001122`, Festvåg: `https://www.vegvesen.no/trafikk/vaerveikamera/3001123` |
 
 Andre justerbare konstanter i samme fil: `DELAY_THRESHOLD` (5 min), `REFRESH_MS` (60 s), `PAGE_FORWARD`, `PAGE_BACK` og `MAX_BACK`.
 
