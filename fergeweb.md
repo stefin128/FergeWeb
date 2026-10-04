@@ -9,7 +9,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 ## Funksjonalitet (versjon 1)
 
 ### Visning
-- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden og en ferge i midten. Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
+- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden og fergen, enten øverst eller mellom kolonnene (se Oppsett). Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
 - Begge kolonnene ligger i **én felles liste med én scrollbar**, slik at de alltid beveger seg sammen.
 - Hver linje viser en avgang fra Misten og på samme linje **returavgangen** fra Festvåg. Returen er første avgang fra Festvåg etter avgangen fra Misten, og før neste avgang fra Misten. Entur oppgir ikke hvilken ferje som går hvilken tur, så sammenkoblingen er tidsbasert. En avgang uten partner får en egen linje med «–» på den andre siden.
 - Kolonneoverskriftene («Fra Misten / til Festvåg», «Fra Festvåg / til Misten») blir liggende øverst når man scroller.
@@ -54,8 +54,11 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Ankomsttid vises ikke.
 - Sanntid oppdateres hvert minutt, og når siden blir synlig igjen etter å ha vært i bakgrunnen.
 
-### Mobil
-- På smal skjerm (under 760 px) ligger bildet øverst, og de to kolonnene står side om side i én felles liste under.
+### Oppsett
+- I toppen velges oppsett: **Kompakt** eller **Bred**. Valget huskes i nettleseren, og standard er Kompakt.
+- **Kompakt:** Bildet ligger øverst, og de to kolonnene står side om side i én felles liste under. På brede skjermer begrenses bredden (maks ca. 980 px) og innholdet sentreres. Dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider.
+- **Bred:** Bildet ligger mellom kolonnene, og dagoverskriften står i begge kolonnene.
+- På smal skjerm (under 760 px) brukes alltid Kompakt, og oppsettvalget skjules. Der er det også mindre luft og tekst.
 - Mørk modus følger systemets innstilling.
 
 ## Konfigurasjon

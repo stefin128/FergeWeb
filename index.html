@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nb">
+<html lang="nb" data-layout="compact">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -43,7 +43,7 @@
     border-bottom: 1px solid var(--line); background: var(--panel);
   }
   header h1 { font-size: 1.1rem; margin: 0; }
-  .modes { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .modes { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .modes button {
     border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .8rem;
     padding: 3px 10px; cursor: pointer;
@@ -145,7 +145,7 @@
     padding: 6px 14px; border: 1px solid var(--line); border-top: 0;
     border-bottom: 1px solid var(--line);
   }
-  .day > div:first-child { text-transform: capitalize; }
+  .day > div:not(.mid) { text-transform: capitalize; }
 
   .loader-row > div:not(.mid) {
     background: var(--panel); border-left: 1px solid var(--line); border-right: 1px solid var(--line);
@@ -170,27 +170,36 @@
   .msg.error { color: var(--cancel); }
 
   /* Mobil: bildet øverst, én felles liste med to kolonner under */
+  /* Kompakt oppsett: bildet øverst og én felles liste med to kolonner under.
+     Brukes alltid på smal skjerm, og ellers når det er valgt (standard). */
+  :root[data-layout="compact"] main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    row-gap: 8px; width: 100%; max-width: 980px; margin: 0 auto;
+  }
+  :root[data-layout="compact"] .map { grid-column: 1; grid-row: 1; aspect-ratio: 1774 / 887; max-height: 32vh; }
+  :root[data-layout="compact"] .map[data-mode="simple"] { aspect-ratio: 400 / 260; }
+  :root[data-layout="compact"] .scroller { grid-column: 1; grid-row: 2; }
+  :root[data-layout="compact"] :is(.heads, .row, .day, .loader-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  :root[data-layout="compact"] .mid { display: none; }
+  /* dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider */
+  :root[data-layout="compact"] .day > div:first-child { grid-column: 1 / -1; text-align: center; }
+  :root[data-layout="compact"] .day > div:last-child { display: none; }
+
+  /* Smal skjerm: mindre luft og tekst */
   @media (max-width: 760px) {
     :root { --gap: 8px; }
-    main {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
-      row-gap: 8px; padding: 8px;
-    }
-    .map { grid-column: 1; grid-row: 1; aspect-ratio: 1774 / 887; max-height: 32vh; }
-    .map[data-mode="simple"] { aspect-ratio: 400 / 260; }
+    main { padding: 8px; }
     header { flex-wrap: wrap; row-gap: 4px; }
+    header .status, .layouts { display: none; }
+    .images { margin-left: auto; }
     .ferrystatus { top: 6px; font-size: .8rem; padding: 2px 10px; }
-    .scroller { grid-column: 1; grid-row: 2; }
-    .heads, .row, .day, .loader-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    .mid { display: none; }
     .cell { padding: 8px 10px; gap: 6px; flex-wrap: wrap; }
     .cell .t { font-size: 1.1rem; }
     .cell .until { margin-left: 0; }
     .heads > div:not(.mid) { padding: 8px 10px 6px; }
     .heads h2 { font-size: .95rem; }
     .day > div:not(.mid) { padding: 6px 10px; }
-    header .status { display: none; }
   }
 </style>
 </head>
@@ -198,7 +207,11 @@
 <header>
   <h1 id="title">Fergetider</h1>
   <span class="status" id="status"></span>
-  <div class="modes" role="group" aria-label="Bilde">
+  <div class="modes layouts" role="group" aria-label="Oppsett" style="margin-left: auto">
+    <button type="button" data-layout="compact" aria-pressed="true" title="Bildet øverst">Kompakt</button>
+    <button type="button" data-layout="wide" aria-pressed="false" title="Bildet mellom kolonnene">Bred</button>
+  </div>
+  <div class="modes images" role="group" aria-label="Bilde">
     <button type="button" data-mode="simple" aria-pressed="false">Enkel</button>
     <button type="button" data-mode="fancy" aria-pressed="true">Foto</button>
   </div>
@@ -544,7 +557,7 @@ class Board {
       const day = fmtDayKey.format(t);
       if (day !== lastDay) {
         const h = el("div", "day");
-        h.append(el("div", null, dayLabel(t)), el("div", "mid"), el("div", null, ""));
+        h.append(el("div", null, dayLabel(t)), el("div", "mid"), el("div", null, dayLabel(t)));
         frag.append(h);
         lastDay = day;
       }
@@ -836,7 +849,7 @@ function placeCamLinks() {
 function setMode(mode) {
   if (!SCENES[mode]) mode = "fancy";
   document.getElementById("map").dataset.mode = mode;
-  for (const b of document.querySelectorAll(".modes button")) b.setAttribute("aria-pressed", b.dataset.mode === mode);
+  for (const b of document.querySelectorAll(".images button")) b.setAttribute("aria-pressed", b.dataset.mode === mode);
   try { localStorage.setItem(MODE_KEY, mode); } catch {}
   placeCamLinks();
 }
@@ -845,7 +858,33 @@ function initMode() {
   let saved = null;
   try { saved = localStorage.getItem(MODE_KEY); } catch {}
   setMode(saved ?? "fancy");
-  for (const b of document.querySelectorAll(".modes button")) b.addEventListener("click", () => setMode(b.dataset.mode));
+  for (const b of document.querySelectorAll(".images button")) b.addEventListener("click", () => setMode(b.dataset.mode));
+}
+
+/* ---------- Oppsett (Kompakt / Bred), huskes i nettleseren ---------- */
+/* Bred (bildet mellom kolonnene) brukes bare når det er valgt og skjermen er bred nok */
+const LAYOUT_KEY = "fergeweb.oppsett";
+const narrow = matchMedia("(max-width: 760px)");
+let layoutPref = "compact";
+
+function applyLayout() {
+  const layout = layoutPref === "wide" && !narrow.matches ? "wide" : "compact";
+  document.documentElement.dataset.layout = layout;
+  for (const b of document.querySelectorAll(".layouts button")) b.setAttribute("aria-pressed", b.dataset.layout === layoutPref);
+  placeCamLinks();
+}
+
+function initLayout() {
+  try { layoutPref = localStorage.getItem(LAYOUT_KEY) === "wide" ? "wide" : "compact"; } catch {}
+  for (const b of document.querySelectorAll(".layouts button")) {
+    b.addEventListener("click", () => {
+      layoutPref = b.dataset.layout;
+      try { localStorage.setItem(LAYOUT_KEY, layoutPref); } catch {}
+      applyLayout();
+    });
+  }
+  narrow.addEventListener("change", applyLayout);
+  applyLayout();
 }
 
 /* Gjør det mulig å "dra" i listen med mus på PC (touch fungerer allerede) */
@@ -881,6 +920,7 @@ async function main() {
   new ResizeObserver(placeCamLinks).observe(document.getElementById("map"));
   window.addEventListener("resize", placeCamLinks);
   initMode();
+  initLayout();
 
   const board = new Board(left, right);
 
