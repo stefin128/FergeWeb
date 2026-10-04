@@ -72,9 +72,21 @@
   .map[data-mode="simple"] .scene[data-scene="fancy"],
   .map[data-mode="fancy"] .scene[data-scene="simple"] { display: none; }
   /* Skilt ved fergeleiene i det enkle bildet (samme stil som i fotoet) */
-  .sign .board { fill: #fff; stroke: #1b2430; stroke-width: .8; }
+  .sign .board { fill: #fff; stroke: #1b2430; }
   .sign .pole { fill: #f1f3f5; stroke: #1b2430; stroke-width: .4; }
-  .sign text { font: 700 11px system-ui, sans-serif; fill: #1b2430; text-anchor: middle; }
+  .sign text { font-weight: 700; font-family: system-ui, sans-serif; fill: #1b2430; text-anchor: middle; }
+  /* Store skilt i fotoet: egne skilt tegnet over skiltene i bildet, bare når valgt */
+  .map:not(.bigsigns) .bigsign { display: none; }
+
+  /* Knapp for store skilt (bestemor med briller), med hake når den er på */
+  .granny {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 28px; padding: 0; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 8px; background: transparent;
+  }
+  .granny[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .granny .check { display: none; }
+  .granny[aria-pressed="true"] .check { display: inline; }
   .ferry { transition: transform 1s linear; }
   .ferry .wake { display: none; }
   .ferry.moving .wake { display: inline; }
@@ -215,6 +227,22 @@
     <button type="button" data-mode="simple" aria-pressed="false">Enkel</button>
     <button type="button" data-mode="fancy" aria-pressed="true">Foto</button>
   </div>
+  <button type="button" class="granny" id="bigSigns" aria-pressed="false"
+          title="Store skilt – lettere å se hva som er på hver side" aria-label="Store skilt">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+      <circle cx="12" cy="4" r="3" fill="#d5d8dc" stroke="#8a9099" stroke-width=".6"/>
+      <circle cx="12" cy="12.5" r="8" fill="#d5d8dc" stroke="#8a9099" stroke-width=".6"/>
+      <ellipse cx="12" cy="14.2" rx="6" ry="6.3" fill="#f3cfae"/>
+      <circle cx="9.3" cy="13.4" r="2.1" fill="#fff" fill-opacity=".5" stroke="#1b2430" stroke-width="1"/>
+      <circle cx="14.7" cy="13.4" r="2.1" fill="#fff" fill-opacity=".5" stroke="#1b2430" stroke-width="1"/>
+      <path d="M11.4 13.3h1.2" stroke="#1b2430" stroke-width="1"/>
+      <path d="M10 17.6q2 1.3 4 0" fill="none" stroke="#a0522d" stroke-width=".9" stroke-linecap="round"/>
+      <g class="check">
+        <circle cx="19.5" cy="19.5" r="4.2" fill="#2b8a3e" stroke="#fff" stroke-width="1"/>
+        <path d="M17.6 19.6l1.3 1.3 2.5-2.7" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+  </button>
   <span class="clock" id="clock"></span>
 </header>
 
@@ -242,16 +270,8 @@
       <path d="M92 182 Q200 200 308 182" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-dasharray="6 6"/>
       <g class="ferries"></g>
       <!-- Skilt ved hvert fergeleie: stolpe fra kaia og en tavle med stedsnavnet -->
-      <g class="sign" id="signLeft" transform="translate(81 0)">
-        <rect class="pole" x="-1" y="140" width="2" height="32"/>
-        <rect class="board" y="124" height="17" rx="3"/>
-        <text y="136.5"></text>
-      </g>
-      <g class="sign" id="signRight" transform="translate(319 0)">
-        <rect class="pole" x="-1" y="140" width="2" height="32"/>
-        <rect class="board" y="124" height="17" rx="3"/>
-        <text y="136.5"></text>
-      </g>
+      <g class="sign" data-side="l"><rect class="pole"/><rect class="board"/><text></text></g>
+      <g class="sign" data-side="r"><rect class="pole"/><rect class="board"/><text></text></g>
     </svg>
 
     <!-- Foto: dempet bilde, med kaier/skilt og fergen fremhevet i full farge -->
@@ -281,6 +301,8 @@
       <!-- Skiltene i fotoet (bildekoordinater), brukt til å plassere webkamera-lenkene -->
       <rect class="hot" data-side="l" x="200" y="332" width="115" height="44" fill="none"/>
       <rect class="hot" data-side="r" x="1547" y="337" width="120" height="44" fill="none"/>
+      <g class="sign bigsign" data-side="l"><rect class="board"/><text></text></g>
+      <g class="sign bigsign" data-side="r"><rect class="board"/><text></text></g>
       <g class="ferries"></g>
     </svg>
 
@@ -803,18 +825,86 @@ function updateFerry(board) {
   document.getElementById("ferryStatus").textContent = text;
 }
 
-/* Setter navnet på et skilt og tilpasser tavlas bredde til teksten.
-   Måles med canvas, siden SVG-en kan være skjult (og da ikke kan måles) når dette kjøres. */
-function setSign(id, name) {
-  const g = document.getElementById(id);
-  const text = g.querySelector("text");
-  text.textContent = name;
-  const ctx = document.createElement("canvas").getContext("2d");
-  ctx.font = getComputedStyle(text).font || "700 11px system-ui, sans-serif";
-  const w = Math.ceil(ctx.measureText(name).width) + 12;
-  const board = g.querySelector(".board");
-  board.setAttribute("x", -w / 2);
-  board.setAttribute("width", w);
+/* ---------- Skilt ved fergeleiene ---------- */
+/*
+ * Skiltene tegnes fra kode, slik at tavla tilpasses navnet og størrelsen kan økes.
+ * x/bottom: midt under tavla, i bildets koordinater. poleTo: der stolpen møter kaia.
+ * I fotoet er skiltene en del av bildet; der tegnes egne skilt over dem bare ved store skilt.
+ */
+const SIGNS = {
+  simple: { width: 400, font: 11, minBig: 14, l: { x: 81, bottom: 141, poleTo: 172 }, r: { x: 319, bottom: 141, poleTo: 172 } },
+  fancy:  { width: 1774, font: null, minBig: 40, l: { x: 257, bottom: 377 }, r: { x: 1607, bottom: 382 } },
+};
+const BIG_SIGN_PX = 18;   // ønsket tekststørrelse på skjermen med store skilt
+let bigSigns = false;
+
+const measureCtx = document.createElement("canvas").getContext("2d");
+function textWidth(text, font) {
+  measureCtx.font = `700 ${font}px system-ui, sans-serif`;
+  return measureCtx.measureText(text).width;
+}
+
+function drawSigns() {
+  const names = { l: CONFIG.left.name, r: CONFIG.right.name };
+  for (const svg of document.querySelectorAll(".map .scene")) {
+    const cfg = SIGNS[svg.dataset.scene];
+    const box = svg.getBoundingClientRect();
+    if (!box.width) continue;   // skjult bilde: tegnes når det vises
+    const [, , vbW, vbH] = svg.getAttribute("viewBox").split(" ").map(Number);
+    const scale = Math.min(box.width / vbW, box.height / vbH);   // skjermpiksler per bildeenhet
+
+    for (const side of ["l", "r"]) {
+      const g = svg.querySelector(`.sign[data-side="${side}"]`);
+      if (!g || (!cfg.font && !bigSigns)) continue;
+      const name = names[side];
+      let font = bigSigns ? Math.max(cfg.minBig, BIG_SIGN_PX / scale) : cfg.font;
+      // tavlene må ikke bli så brede at de møtes på midten
+      const maxW = cfg.width * 0.47;
+      const w0 = textWidth(name, font) + font * 1.1;
+      if (w0 > maxW) font *= maxW / w0;
+
+      const w = textWidth(name, font) + font * 1.1, h = font * 1.55;
+      const a = cfg[side];
+      const margin = cfg.width * 0.01;
+      const cx = Math.min(Math.max(a.x, w / 2 + margin), cfg.width - w / 2 - margin);
+
+      const board = g.querySelector(".board");
+      Object.entries({ x: cx - w / 2, y: a.bottom - h, width: w, height: h, rx: font * 0.25 })
+        .forEach(([k, v]) => board.setAttribute(k, v));
+      board.style.strokeWidth = font * 0.07;
+      const text = g.querySelector("text");
+      text.textContent = name;
+      text.setAttribute("x", cx);
+      text.setAttribute("y", a.bottom - h * 0.3);
+      text.style.fontSize = `${font}px`;
+      const pole = g.querySelector(".pole");
+      if (pole) Object.entries({ x: a.x - 1, y: a.bottom, width: 2, height: a.poleTo - a.bottom })
+        .forEach(([k, v]) => pole.setAttribute(k, v));
+    }
+  }
+}
+
+function refreshSigns() {
+  drawSigns();
+  placeCamLinks();
+}
+
+/* ---------- Store skilt (bestemor-knappen), huskes i nettleseren ---------- */
+const BIG_KEY = "fergeweb.storeSkilt";
+
+function setBigSigns(on) {
+  bigSigns = on;
+  document.getElementById("map").classList.toggle("bigsigns", on);
+  document.getElementById("bigSigns").setAttribute("aria-pressed", on);
+  try { localStorage.setItem(BIG_KEY, on ? "1" : "0"); } catch {}
+  refreshSigns();
+}
+
+function initBigSigns() {
+  let saved = false;
+  try { saved = localStorage.getItem(BIG_KEY) === "1"; } catch {}
+  document.getElementById("bigSigns").addEventListener("click", () => setBigSigns(!bigSigns));
+  setBigSigns(saved);
 }
 
 /* ---------- Valg av bilde (Enkel / Foto), huskes i nettleseren ---------- */
@@ -825,9 +915,9 @@ const MODE_KEY = "fergeweb.bilde";
 function placeCamLinks() {
   const main = document.querySelector("main").getBoundingClientRect();
   const mode = document.getElementById("map").dataset.mode;
-  for (const [side, place, linkId, signId] of [
-    ["l", CONFIG.left, "camLeft", "signLeft"],
-    ["r", CONFIG.right, "camRight", "signRight"],
+  for (const [side, place, linkId] of [
+    ["l", CONFIG.left, "camLeft"],
+    ["r", CONFIG.right, "camRight"],
   ]) {
     const a = document.getElementById(linkId);
     a.hidden = !place.webcam;
@@ -835,9 +925,10 @@ function placeCamLinks() {
     a.href = place.webcam;
     a.title = `Webkamera ved ${place.name} fergeleie (Statens vegvesen)`;
     a.setAttribute("aria-label", a.title);
+    const fancy = '.scene[data-scene="fancy"]';
     const target = mode === "simple"
-      ? document.querySelector(`#${signId} .board`)
-      : document.querySelector(`.scene[data-scene="fancy"] .hot[data-side="${side}"]`);
+      ? document.querySelector(`.scene[data-scene="simple"] .sign[data-side="${side}"] .board`)
+      : document.querySelector(bigSigns ? `${fancy} .bigsign[data-side="${side}"] .board` : `${fancy} .hot[data-side="${side}"]`);
     const r = target.getBoundingClientRect();
     Object.assign(a.style, {
       left: `${r.left - main.left}px`, top: `${r.top - main.top}px`,
@@ -851,7 +942,7 @@ function setMode(mode) {
   document.getElementById("map").dataset.mode = mode;
   for (const b of document.querySelectorAll(".images button")) b.setAttribute("aria-pressed", b.dataset.mode === mode);
   try { localStorage.setItem(MODE_KEY, mode); } catch {}
-  placeCamLinks();
+  refreshSigns();
 }
 
 function initMode() {
@@ -871,7 +962,7 @@ function applyLayout() {
   const layout = layoutPref === "wide" && !narrow.matches ? "wide" : "compact";
   document.documentElement.dataset.layout = layout;
   for (const b of document.querySelectorAll(".layouts button")) b.setAttribute("aria-pressed", b.dataset.layout === layoutPref);
-  placeCamLinks();
+  refreshSigns();
 }
 
 function initLayout() {
@@ -915,10 +1006,9 @@ async function main() {
   document.title = `Ferge ${left.name} – ${right.name}`;
   document.getElementById("title").textContent = `${left.name} – ${right.name}${route ? ` (${route})` : ""}`;
 
-  setSign("signLeft", left.name);
-  setSign("signRight", right.name);
-  new ResizeObserver(placeCamLinks).observe(document.getElementById("map"));
-  window.addEventListener("resize", placeCamLinks);
+  new ResizeObserver(refreshSigns).observe(document.getElementById("map"));
+  window.addEventListener("resize", refreshSigns);
+  initBigSigns();
   initMode();
   initLayout();
 

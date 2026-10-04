@@ -21,6 +21,14 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
 - Valgknappen ligger i toppen og ikke i bildet, fordi listen ligger over bildet på PC.
 
+### Store skilt
+- Knappen med en bestemor med briller i toppen slår på **store skilt**, slik at det er lett å se hvilket fergeleie som er på hver side av bildet. Knappen får en grønn hake når den er på. Valget huskes i nettleseren, og standard er av.
+- Skriftstørrelsen tilpasses hvor stort bildet faktisk vises, med mål om ca. 18 px tekst på skjermen. Skiltene blir derfor lesbare også på mobil.
+- **Enkelt bilde:** Skiltene ved fergeleiene blir større. Tavlene flyttes litt inn mot midten ved behov, så de ikke går utenfor bildet.
+- **Foto:** Skiltene er en del av bildet. Med store skilt tegnes egne, større skilt oppå skiltene i fotoet, på samme sted.
+- Webkamera-lenkene følger skiltene, også når de er store.
+- Knappen vises også på smal skjerm.
+
 ### Webkamera
 - Skiltene ved fergeleiene, i både enkelt bilde og foto, er lenker til Statens vegvesens webkamera ved fergeleiet. Lenken åpnes i en ny fane, og skiltet er merket med et lite kameramerke.
 - Webkamera-adressen ligger i `CONFIG` (`webcam`) for hvert fergeleie. Uten adresse blir skiltet ikke en lenke.
