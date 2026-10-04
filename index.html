@@ -67,11 +67,14 @@
     display: flex; align-items: center;
   }
   /* fotoet: farger fra øverste og nederste kant, dempet som resten av bildet */
-  .map[data-mode="fancy"] { background: linear-gradient(#3c7ab1 50%, #134f79 50%); }
+  .map[data-mode="fancy"] { background: linear-gradient(#729bc0 50%, #507894 50%); }
   .map .scene { width: 100%; height: 100%; display: block; }
   .map[data-mode="simple"] .scene[data-scene="fancy"],
   .map[data-mode="fancy"] .scene[data-scene="simple"] { display: none; }
-  .map .lbl { font: 600 15px system-ui, sans-serif; fill: var(--text); }
+  /* Skilt ved fergeleiene i det enkle bildet (samme stil som i fotoet) */
+  .sign .board { fill: #fff; stroke: #1b2430; stroke-width: .8; }
+  .sign .pole { fill: #f1f3f5; stroke: #1b2430; stroke-width: .4; }
+  .sign text { font: 700 11px system-ui, sans-serif; fill: #1b2430; text-anchor: middle; }
   .ferry { transition: transform 1s linear; }
   .ferry .wake { display: none; }
   .ferry.moving .wake { display: inline; }
@@ -212,17 +215,29 @@
       <rect x="308" y="172" width="22" height="6" fill="#8a7a66"/>
       <path d="M92 182 Q200 200 308 182" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-dasharray="6 6"/>
       <g class="ferries"></g>
-      <text class="lbl" id="lblLeft" x="16" y="235"></text>
-      <text class="lbl" id="lblRight" x="384" y="235" text-anchor="end"></text>
+      <!-- Skilt ved hvert fergeleie: stolpe fra kaia og en tavle med stedsnavnet -->
+      <g class="sign" id="signLeft" transform="translate(81 0)">
+        <rect class="pole" x="-1" y="140" width="2" height="32"/>
+        <rect class="board" y="124" height="17" rx="3"/>
+        <text y="136.5"></text>
+      </g>
+      <g class="sign" id="signRight" transform="translate(319 0)">
+        <rect class="pole" x="-1" y="140" width="2" height="32"/>
+        <rect class="board" y="124" height="17" rx="3"/>
+        <text y="136.5"></text>
+      </g>
     </svg>
 
     <!-- Foto: dempet bilde, med kaier/skilt og fergen fremhevet i full farge -->
     <svg class="scene" data-scene="fancy" viewBox="0 0 1774 887" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
+        <!-- Demping: beholder fargene, men legger et lett dis over (lavere kontrast, litt lysere) -->
         <filter id="dim" color-interpolation-filters="sRGB">
-          <feColorMatrix type="saturate" values="0.35"/>
+          <feColorMatrix type="saturate" values="0.8"/>
           <feComponentTransfer>
-            <feFuncR type="linear" slope="0.72"/><feFuncG type="linear" slope="0.72"/><feFuncB type="linear" slope="0.72"/>
+            <feFuncR type="linear" slope="0.6" intercept="0.22"/>
+            <feFuncG type="linear" slope="0.6" intercept="0.22"/>
+            <feFuncB type="linear" slope="0.6" intercept="0.22"/>
           </feComponentTransfer>
         </filter>
         <radialGradient id="spotGrad">
@@ -756,6 +771,20 @@ function updateFerry(board) {
   document.getElementById("ferryStatus").textContent = text;
 }
 
+/* Setter navnet på et skilt og tilpasser tavlas bredde til teksten.
+   Måles med canvas, siden SVG-en kan være skjult (og da ikke kan måles) når dette kjøres. */
+function setSign(id, name) {
+  const g = document.getElementById(id);
+  const text = g.querySelector("text");
+  text.textContent = name;
+  const ctx = document.createElement("canvas").getContext("2d");
+  ctx.font = getComputedStyle(text).font || "700 11px system-ui, sans-serif";
+  const w = Math.ceil(ctx.measureText(name).width) + 12;
+  const board = g.querySelector(".board");
+  board.setAttribute("x", -w / 2);
+  board.setAttribute("width", w);
+}
+
 /* ---------- Valg av bilde (Enkel / Foto), huskes i nettleseren ---------- */
 const MODE_KEY = "fergeweb.bilde";
 
@@ -801,8 +830,8 @@ async function main() {
   document.title = `Ferge ${left.name} – ${right.name}`;
   document.getElementById("title").textContent = `${left.name} – ${right.name}${route ? ` (${route})` : ""}`;
 
-  document.getElementById("lblLeft").textContent = left.name;
-  document.getElementById("lblRight").textContent = right.name;
+  setSign("signLeft", left.name);
+  setSign("signRight", right.name);
   initMode();
 
   const board = new Board(left, right);

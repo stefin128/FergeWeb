@@ -17,8 +17,8 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 
 ### Valg av bilde
 - I toppen kan man velge mellom to bilder: **Enkel** og **Foto**. Valget huskes i nettleseren, og standard er Foto.
-- **Enkel** er en tegnet fjord med stedsnavnene under fergeleiene. Den følger lys og mørk modus.
-- **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet (lavere fargemetning og lysstyrke). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
+- **Enkel** er en tegnet fjord. Ved hvert fergeleie står et skilt med stedsnavnet, i samme stil som skiltene i fotoet. Skiltets bredde tilpasses navnet. Den følger lys og mørk modus.
+- **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
 - Valgknappen ligger i toppen og ikke i bildet, fordi listen ligger over bildet på PC.
 
 ### Fergens posisjon
@@ -92,3 +92,4 @@ I prioritert rekkefølge:
 - [] Konfigurasjon: valg av avgangssted, og deretter automatisk valg av anløpssted (se over).
 - [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
 - [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
+- [x] Fra alfa-tester: skilt ved hvert fergeleie i enkelt bilde i stedet for tekst nederst.
