@@ -9,7 +9,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 ## Funksjonalitet (versjon 1)
 
 ### Visning
-- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden og fergen, enten øverst eller mellom kolonnene (se Oppsett). Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
+- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden og fergen øverst (se Oppsett). Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
 - Begge kolonnene ligger i **én felles liste med én scrollbar**, slik at de alltid beveger seg sammen.
 - Hver linje viser en avgang fra Misten og på samme linje **returavgangen** fra Festvåg. Returen er første avgang fra Festvåg etter avgangen fra Misten, og før neste avgang fra Misten. Entur oppgir ikke hvilken ferje som går hvilken tur, så sammenkoblingen er tidsbasert. En avgang uten partner får en egen linje med «–» på den andre siden.
 - Kolonneoverskriftene («Fra Misten / til Festvåg», «Fra Festvåg / til Misten») blir liggende øverst når man scroller.
@@ -17,17 +17,15 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 
 ### Valg av bilde
 - I toppen kan man velge mellom to bilder: **Enkel** og **Foto**. Valget huskes i nettleseren, og standard er Foto.
-- **Enkel** er en tegnet fjord. Ved hvert fergeleie står et skilt med stedsnavnet, i samme stil som skiltene i fotoet. Skiltets bredde tilpasses navnet. Den følger lys og mørk modus.
+- **Enkel** er en tegnet fjord med et skilt med stedsnavnet ved hvert fergeleie (se Store skilt). Den følger lys og mørk modus.
 - **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
-- Valgknappen ligger i toppen og ikke i bildet, fordi listen ligger over bildet på PC.
 
 ### Store skilt
-- Knappen med en bestemor med briller i toppen slår på **store skilt**, slik at det er lett å se hvilket fergeleie som er på hver side av bildet. Knappen får en grønn hake når den er på. Valget huskes i nettleseren, og standard er av.
+- Skiltene ved fergeleiene vises alltid med stor skrift, slik at også eldre brukere lett ser hvilket fergeleie som er på hver side av bildet. Dette er ikke valgbart.
 - Skriftstørrelsen tilpasses hvor stort bildet faktisk vises, med mål om ca. 18 px tekst på skjermen. Skiltene blir derfor lesbare også på mobil.
-- **Enkelt bilde:** Skiltene ved fergeleiene blir større. Tavlene flyttes litt inn mot midten ved behov, så de ikke går utenfor bildet.
-- **Foto:** Skiltene er en del av bildet. Med store skilt tegnes egne, større skilt oppå skiltene i fotoet, på samme sted.
-- Webkamera-lenkene følger skiltene, også når de er store.
-- Knappen vises også på smal skjerm.
+- **Enkelt bilde:** Skiltene står på stolper ved fergeleiene. Tavlene flyttes litt inn mot midten ved behov, så de ikke går utenfor bildet.
+- **Foto:** Skiltene er en del av bildet. Egne, større skilt tegnes oppå skiltene i fotoet, på samme sted.
+- Webkamera-lenkene følger skiltene.
 
 ### Webkamera
 - Skiltene ved fergeleiene, i både enkelt bilde og foto, er lenker til Statens vegvesens webkamera ved fergeleiet. Lenken åpnes i en ny fane, og skiltet er merket med et lite kameramerke.
@@ -38,7 +36,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Fergen tegnes i bildet der den antas å være akkurat nå, og flyttes hvert sekund. Når den ligger ved kai, ligger den inntil fergeleiet. Under overfart går den i en bue litt nærmere betrakteren, tegnes litt større midt i fjorden, vugger svakt og har kjølvann bak seg.
 - Under en overfart flyttes den jevnt langs ruten mellom fergeleiene, fra forventet avgang til forventet ankomst. Entur gir ingen posisjonsdata, så dette er et anslag. Mangler forventet ankomst, brukes rutetid for ankomst forskjøvet med samme forsinkelse som ved avgang.
 - Når ingen overfart pågår, ligger fergen ved kaien den sist ankom.
-- Øverst i bildet står en statuslinje, for eksempel «Underveis til Festvåg · ankomst ca. 19:10» eller «Ved Misten · neste avgang 19:15».
+- Nederst i bildet står en statuslinje, for eksempel «Underveis til Festvåg · ankomst ca. 19:10» eller «Ved Misten · neste avgang 19:15».
 - Innstilte avganger regnes ikke med. Går flere overfarter samtidig (flere ferjer), tegnes én ferge per overfart.
 
 ### Tid og dager
@@ -63,10 +61,10 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Sanntid oppdateres hvert minutt, og når siden blir synlig igjen etter å ha vært i bakgrunnen.
 
 ### Oppsett
-- I toppen velges oppsett: **Kompakt** eller **Bred**. Valget huskes i nettleseren, og standard er Kompakt.
-- **Kompakt:** Bildet ligger øverst, og de to kolonnene står side om side i én felles liste under. På brede skjermer begrenses bredden (maks ca. 980 px) og innholdet sentreres. Dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider.
-- **Bred:** Bildet ligger mellom kolonnene, og dagoverskriften står i begge kolonnene.
-- På smal skjerm (under 760 px) brukes alltid Kompakt, og oppsettvalget skjules. Der er det også mindre luft og tekst.
+- Bildet ligger øverst, og de to kolonnene står side om side i én felles liste under. Dette er det eneste oppsettet og er ikke valgbart.
+- På brede skjermer begrenses bredden (maks ca. 980 px), og innholdet sentreres.
+- Dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider.
+- På smal skjerm (under 760 px) er det mindre luft og tekst.
 - Mørk modus følger systemets innstilling.
 
 ## Konfigurasjon

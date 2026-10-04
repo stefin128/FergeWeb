@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nb" data-layout="compact">
+<html lang="nb">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -43,7 +43,7 @@
     border-bottom: 1px solid var(--line); background: var(--panel);
   }
   header h1 { font-size: 1.1rem; margin: 0; }
-  .modes { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .modes { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .modes button {
     border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .8rem;
     padding: 3px 10px; cursor: pointer;
@@ -52,20 +52,23 @@
   header .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
   header .status { font-size: .85rem; color: var(--muted); }
 
-  /* Bildet ligger fast i midtkolonnen, bak den ene felles scrolleren */
+  /* Bildet øverst og én felles liste med to kolonner under. På store skjermer begrenses bredden. */
   main {
     flex: 1; min-height: 0; position: relative;
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    column-gap: var(--gap); padding: 12px 16px;
+    display: grid; grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    row-gap: 8px; padding: 12px 16px; width: 100%; max-width: 980px; margin: 0 auto;
   }
   .map {
-    grid-column: 2; grid-row: 1; min-height: 0; position: relative;
+    grid-column: 1; grid-row: 1; position: relative;
+    /* full bredde, men ikke høyere enn 32 % av skjermen; sentreres når høyden begrenser */
+    aspect-ratio: 1774 / 887; width: min(100%, 32vh * 1774 / 887); justify-self: center;
     border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
-    /* himmel over og sjø under, slik at bildet kan stå midt i en høy kolonne uten å beskjæres */
+    /* himmel over og sjø under, slik at bildet kan stå sentrert uten å beskjæres når høyden begrenses */
     background: linear-gradient(var(--sky1) 50%, var(--sea2) 50%);
     display: flex; align-items: center;
   }
+  .map[data-mode="simple"] { aspect-ratio: 400 / 260; width: min(100%, 32vh * 400 / 260); }
   /* fotoet: farger fra øverste og nederste kant, dempet som resten av bildet */
   .map[data-mode="fancy"] { background: linear-gradient(#729bc0 50%, #507894 50%); }
   .map .scene { width: 100%; height: 100%; display: block; }
@@ -75,18 +78,7 @@
   .sign .board { fill: #fff; stroke: #1b2430; }
   .sign .pole { fill: #f1f3f5; stroke: #1b2430; stroke-width: .4; }
   .sign text { font-weight: 700; font-family: system-ui, sans-serif; fill: #1b2430; text-anchor: middle; }
-  /* Store skilt i fotoet: egne skilt tegnet over skiltene i bildet, bare når valgt */
-  .map:not(.bigsigns) .bigsign { display: none; }
 
-  /* Knapp for store skilt (bestemor med briller), med hake når den er på */
-  .granny {
-    position: relative; display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 28px; padding: 0; cursor: pointer;
-    border: 1px solid var(--line); border-radius: 8px; background: transparent;
-  }
-  .granny[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
-  .granny .check { display: none; }
-  .granny[aria-pressed="true"] .check { display: inline; }
   .ferry { transition: transform 1s linear; }
   .ferry .wake { display: none; }
   .ferry.moving .wake { display: inline; }
@@ -95,14 +87,14 @@
   @keyframes bob { 50% { transform: translateY(2px) rotate(.4deg); } }
   @media (prefers-reduced-motion: reduce) { .ferry { transition: none; } .ferry.moving .bob { animation: none; } }
   .ferrystatus {
-    position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 1;
-    max-width: calc(100% - 16px); text-align: center;
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 1;
+    width: max-content; max-width: calc(100% - 16px); text-align: center;
     background: color-mix(in srgb, var(--panel) 85%, transparent); color: var(--text);
     border-radius: 14px; padding: 4px 12px; font-size: .85rem; font-variant-numeric: tabular-nums;
   }
   .ferrystatus:empty { display: none; }
 
-  /* Klikkbare skilt: usynlige lenkeflater lagt over skiltet i bildet (over listen, så de kan klikkes på PC) */
+  /* Klikkbare skilt: usynlige lenkeflater lagt over skiltet i bildet */
   .camlink {
     position: absolute; z-index: 3; border-radius: 4px;
     outline: 2px solid transparent; outline-offset: 1px; transition: outline-color .15s;
@@ -116,19 +108,19 @@
   }
 
   .scroller {
-    grid-column: 1 / -1; grid-row: 1; z-index: 1; min-height: 0;
+    grid-column: 1; grid-row: 2; min-height: 0;
     overflow-y: auto; overscroll-behavior: contain; position: relative;
     touch-action: pan-y; cursor: grab;
   }
   .scroller.dragging { cursor: grabbing; user-select: none; }
 
-  /* Alle rader bruker samme tre kolonner som main */
+  /* Alle rader bruker de samme to kolonnene */
   .heads, .row, .day, .loader-row {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: var(--gap);
   }
   .heads { position: sticky; top: 0; z-index: 3; }
-  .heads > div:not(.mid) {
+  .heads > div {
     background: var(--panel); border: 1px solid var(--line); border-bottom: 0;
     border-radius: 10px 10px 0 0; padding: 10px 14px 8px;
   }
@@ -152,18 +144,19 @@
   .cell.none { color: var(--past); }
 
   .day { position: sticky; top: var(--heads-h); z-index: 2; }
-  .day > div:not(.mid) {
+  /* dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider */
+  .day > div {
+    grid-column: 1 / -1; text-align: center;
     background: var(--panel); color: var(--muted); font-size: .8rem; font-weight: 600;
     padding: 6px 14px; border: 1px solid var(--line); border-top: 0;
     border-bottom: 1px solid var(--line);
   }
-  .day > div:not(.mid) { text-transform: capitalize; }
 
-  .loader-row > div:not(.mid) {
+  .loader-row > div {
     background: var(--panel); border-left: 1px solid var(--line); border-right: 1px solid var(--line);
     text-align: center; color: var(--muted); font-size: .8rem; padding: 8px;
   }
-  .loader-row.bottom > div:not(.mid) { border-bottom: 1px solid var(--line); border-radius: 0 0 10px 10px; }
+  .loader-row.bottom > div { border-bottom: 1px solid var(--line); border-radius: 0 0 10px 10px; }
 
   .nowline { position: relative; height: 0; border-top: 2px solid var(--now); margin-top: -1px; z-index: 1; }
   .nowline span {
@@ -181,37 +174,20 @@
   .msg { grid-column: 1 / -1; padding: 20px 14px; color: var(--muted); text-align: center; background: var(--panel); }
   .msg.error { color: var(--cancel); }
 
-  /* Mobil: bildet øverst, én felles liste med to kolonner under */
-  /* Kompakt oppsett: bildet øverst og én felles liste med to kolonner under.
-     Brukes alltid på smal skjerm, og ellers når det er valgt (standard). */
-  :root[data-layout="compact"] main {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    row-gap: 8px; width: 100%; max-width: 980px; margin: 0 auto;
-  }
-  :root[data-layout="compact"] .map { grid-column: 1; grid-row: 1; aspect-ratio: 1774 / 887; max-height: 32vh; }
-  :root[data-layout="compact"] .map[data-mode="simple"] { aspect-ratio: 400 / 260; }
-  :root[data-layout="compact"] .scroller { grid-column: 1; grid-row: 2; }
-  :root[data-layout="compact"] :is(.heads, .row, .day, .loader-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  :root[data-layout="compact"] .mid { display: none; }
-  /* dagoverskriften spenner over begge kolonnene, siden den gjelder begge sider */
-  :root[data-layout="compact"] .day > div:first-child { grid-column: 1 / -1; text-align: center; }
-  :root[data-layout="compact"] .day > div:last-child { display: none; }
 
   /* Smal skjerm: mindre luft og tekst */
   @media (max-width: 760px) {
     :root { --gap: 8px; }
     main { padding: 8px; }
     header { flex-wrap: wrap; row-gap: 4px; }
-    header .status, .layouts { display: none; }
-    .images { margin-left: auto; }
-    .ferrystatus { top: 6px; font-size: .8rem; padding: 2px 10px; }
+    header .status { display: none; }
+    .ferrystatus { bottom: 6px; font-size: .8rem; padding: 2px 10px; }
     .cell { padding: 8px 10px; gap: 6px; flex-wrap: wrap; }
     .cell .t { font-size: 1.1rem; }
     .cell .until { margin-left: 0; }
-    .heads > div:not(.mid) { padding: 8px 10px 6px; }
+    .heads > div { padding: 8px 10px 6px; }
     .heads h2 { font-size: .95rem; }
-    .day > div:not(.mid) { padding: 6px 10px; }
+    .day > div { padding: 6px 10px; }
   }
 </style>
 </head>
@@ -219,30 +195,10 @@
 <header>
   <h1 id="title">Fergetider</h1>
   <span class="status" id="status"></span>
-  <div class="modes layouts" role="group" aria-label="Oppsett" style="margin-left: auto">
-    <button type="button" data-layout="compact" aria-pressed="true" title="Bildet øverst">Kompakt</button>
-    <button type="button" data-layout="wide" aria-pressed="false" title="Bildet mellom kolonnene">Bred</button>
-  </div>
   <div class="modes images" role="group" aria-label="Bilde">
     <button type="button" data-mode="simple" aria-pressed="false">Enkel</button>
     <button type="button" data-mode="fancy" aria-pressed="true">Foto</button>
   </div>
-  <button type="button" class="granny" id="bigSigns" aria-pressed="false"
-          title="Store skilt – lettere å se hva som er på hver side" aria-label="Store skilt">
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-      <circle cx="12" cy="4" r="3" fill="#d5d8dc" stroke="#8a9099" stroke-width=".6"/>
-      <circle cx="12" cy="12.5" r="8" fill="#d5d8dc" stroke="#8a9099" stroke-width=".6"/>
-      <ellipse cx="12" cy="14.2" rx="6" ry="6.3" fill="#f3cfae"/>
-      <circle cx="9.3" cy="13.4" r="2.1" fill="#fff" fill-opacity=".5" stroke="#1b2430" stroke-width="1"/>
-      <circle cx="14.7" cy="13.4" r="2.1" fill="#fff" fill-opacity=".5" stroke="#1b2430" stroke-width="1"/>
-      <path d="M11.4 13.3h1.2" stroke="#1b2430" stroke-width="1"/>
-      <path d="M10 17.6q2 1.3 4 0" fill="none" stroke="#a0522d" stroke-width=".9" stroke-linecap="round"/>
-      <g class="check">
-        <circle cx="19.5" cy="19.5" r="4.2" fill="#2b8a3e" stroke="#fff" stroke-width="1"/>
-        <path d="M17.6 19.6l1.3 1.3 2.5-2.7" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-    </svg>
-  </button>
   <span class="clock" id="clock"></span>
 </header>
 
@@ -298,11 +254,9 @@
       </defs>
       <image class="bgimg" width="1774" height="887" filter="url(#dim)"/>
       <image class="bgimg" width="1774" height="887" mask="url(#spot)"/>
-      <!-- Skiltene i fotoet (bildekoordinater), brukt til å plassere webkamera-lenkene -->
-      <rect class="hot" data-side="l" x="200" y="332" width="115" height="44" fill="none"/>
-      <rect class="hot" data-side="r" x="1547" y="337" width="120" height="44" fill="none"/>
-      <g class="sign bigsign" data-side="l"><rect class="board"/><text></text></g>
-      <g class="sign bigsign" data-side="r"><rect class="board"/><text></text></g>
+      <!-- Skiltene er en del av fotoet; egne, større skilt tegnes oppå dem -->
+      <g class="sign" data-side="l"><rect class="board"/><text></text></g>
+      <g class="sign" data-side="r"><rect class="board"/><text></text></g>
       <g class="ferries"></g>
     </svg>
 
@@ -331,7 +285,6 @@
   <div class="scroller" id="scroller">
     <div class="heads" id="heads">
       <div><h2 id="headLeft"></h2><div class="sub" id="subLeft"></div></div>
-      <div class="mid"></div>
       <div><h2 id="headRight"></h2><div class="sub" id="subRight"></div></div>
     </div>
     <div id="rows"></div>
@@ -357,7 +310,7 @@ const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
 const TZ = "Europe/Oslo";
 const HOUR = 3600e3;
-const INITIAL_BACK = 3 * HOUR;      // vis noen timer bakover ved oppstart
+const INITIAL_BACK = 12 * HOUR;     // hent nok bakover til at det finnes passerte avganger over "nå"
 const INITIAL_FORWARD = 30 * HOUR;
 const PAGE_FORWARD = 24 * HOUR;     // ved scroll videre fremover
 const PAGE_BACK = 12 * HOUR;        // ved scroll bakover
@@ -466,7 +419,7 @@ function dayLabel(ms) {
   if (key === fmtDayKey.format(Date.now())) return `I dag – ${name}`;
   if (key === fmtDayKey.format(Date.now() + 24 * HOUR)) return `I morgen – ${name}`;
   if (key === fmtDayKey.format(Date.now() - 24 * HOUR)) return `I går – ${name}`;
-  return name;
+  return name.charAt(0).toUpperCase() + name.slice(1);   // bare første bokstav stor
 }
 
 function until(ms) {
@@ -556,7 +509,7 @@ class Board {
 
     const loaderRow = (cls, text) => {
       const r = el("div", `loader-row ${cls}`);
-      r.append(el("div", null, text), el("div", "mid"), el("div", null, text));
+      r.append(el("div", null, text), el("div", null, text));
       return r;
     };
     frag.append(loaderRow("top", this.backExhausted ? "Ingen tidligere avganger" : "Dra ned for tidligere avganger"));
@@ -579,7 +532,7 @@ class Board {
       const day = fmtDayKey.format(t);
       if (day !== lastDay) {
         const h = el("div", "day");
-        h.append(el("div", null, dayLabel(t)), el("div", "mid"), el("div", null, dayLabel(t)));
+        h.append(el("div", null, dayLabel(t)));
         frag.append(h);
         lastDay = day;
       }
@@ -587,8 +540,9 @@ class Board {
       if (anyFuture && !nowPlaced) { frag.append(nowLine()); nowPlaced = true; }
 
       const row = el("div", "row");
-      row.dataset.key = (l ?? r).key;
-      row.append(this.cell(l, now, nextKey.l), el("div", "mid"), this.cell(r, now, nextKey.r));
+      // begge avgangene på raden: sammenkoblingen kan endre seg når flere avganger hentes
+      row.dataset.key = [l?.key, r?.key].filter(Boolean).join(" ");
+      row.append(this.cell(l, now, nextKey.l), this.cell(r, now, nextKey.r));
       frag.append(row);
     }
     if (rows.length && !nowPlaced) frag.append(nowLine());
@@ -622,15 +576,16 @@ class Board {
     return this.heads.offsetHeight + (this.rowsEl.querySelector(".day")?.offsetHeight ?? 0);
   }
 
-  /* Re-render uten at innholdet hopper: hold første synlige rad på samme plass */
+  /* Re-render uten at innholdet hopper: hold første synlige rad på samme plass.
+     Raden finnes igjen via en av avgangene på den, siden en avgang kan ha fått ny partner. */
   renderKeepingPosition() {
     const anchor = this.firstVisibleRow();
     const offset = anchor ? anchor.getBoundingClientRect().top : 0;
-    const key = anchor?.dataset.key;
+    const keys = anchor?.dataset.key.split(" ") ?? [];
     this.render();
-    if (key) {
-      const again = this.rowsEl.querySelector(`.row[data-key="${CSS.escape(key)}"]`);
-      if (again) this.scroller.scrollTop += again.getBoundingClientRect().top - offset;
+    for (const key of keys) {
+      const again = this.rowsEl.querySelector(`.row[data-key~="${CSS.escape(key)}"]`);
+      if (again) { this.scroller.scrollTop += again.getBoundingClientRect().top - offset; break; }
     }
     this.updateNowButton();
   }
@@ -646,12 +601,12 @@ class Board {
   scrollToNow(smooth) {
     const nowline = this.rowsEl.querySelector(".nowline");
     if (!nowline) return;
-    // vis én passert rad over "nå"-streken – men ikke hvis neste avgang er på en ny dag,
-    // da skal dagoverskriften for den nye dagen stå øverst
+    // "nå"-streken rett under overskriftene, med én passert rad over hvis den er på samme dag.
+    // Starter neste avgang en ny dag, står dagoverskriften for den nye dagen øverst.
+    let top = nowline.offsetTop - this.stickyHeight();
     const prev = nowline.previousElementSibling;
-    const next = nowline.nextElementSibling;
-    const ref = prev?.matches(".row[data-key]") ? prev : next ?? nowline;
-    this.scroller.scrollTo({ top: ref.offsetTop - this.stickyHeight(), behavior: smooth ? "smooth" : "auto" });
+    if (prev?.matches(".row[data-key]")) top -= prev.offsetHeight;
+    this.scroller.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
   }
 
   onScroll() {
@@ -665,7 +620,7 @@ class Board {
     const nl = this.rowsEl.querySelector(".nowline");
     if (!nl) { this.btn.hidden = true; return; }
     const r = nl.getBoundingClientRect(), s = this.scroller.getBoundingClientRect();
-    this.btn.hidden = r.top > s.top + this.stickyHeight() && r.top < s.bottom;
+    this.btn.hidden = r.top >= s.top + this.stickyHeight() - 2 && r.top < s.bottom;   // litt slingringsmonn i kanten
   }
 
   async loadForward() {
@@ -827,16 +782,16 @@ function updateFerry(board) {
 
 /* ---------- Skilt ved fergeleiene ---------- */
 /*
- * Skiltene tegnes fra kode, slik at tavla tilpasses navnet og størrelsen kan økes.
+ * Skiltene tegnes fra kode med stor skrift, slik at det er lett å se hva som er på hver side.
+ * Tavla tilpasses navnet og hvor stort bildet vises. I fotoet tegnes de over skiltene i bildet.
  * x/bottom: midt under tavla, i bildets koordinater. poleTo: der stolpen møter kaia.
- * I fotoet er skiltene en del av bildet; der tegnes egne skilt over dem bare ved store skilt.
+ * minFont: minste skriftstørrelse i bildets koordinater.
  */
 const SIGNS = {
-  simple: { width: 400, font: 11, minBig: 14, l: { x: 81, bottom: 141, poleTo: 172 }, r: { x: 319, bottom: 141, poleTo: 172 } },
-  fancy:  { width: 1774, font: null, minBig: 40, l: { x: 257, bottom: 377 }, r: { x: 1607, bottom: 382 } },
+  simple: { width: 400, minFont: 14, l: { x: 81, bottom: 141, poleTo: 172 }, r: { x: 319, bottom: 141, poleTo: 172 } },
+  fancy:  { width: 1774, minFont: 40, l: { x: 257, bottom: 377 }, r: { x: 1607, bottom: 382 } },
 };
-const BIG_SIGN_PX = 18;   // ønsket tekststørrelse på skjermen med store skilt
-let bigSigns = false;
+const SIGN_PX = 18;   // ønsket tekststørrelse på skjermen
 
 const measureCtx = document.createElement("canvas").getContext("2d");
 function textWidth(text, font) {
@@ -855,9 +810,9 @@ function drawSigns() {
 
     for (const side of ["l", "r"]) {
       const g = svg.querySelector(`.sign[data-side="${side}"]`);
-      if (!g || (!cfg.font && !bigSigns)) continue;
+      if (!g) continue;
       const name = names[side];
-      let font = bigSigns ? Math.max(cfg.minBig, BIG_SIGN_PX / scale) : cfg.font;
+      let font = Math.max(cfg.minFont, SIGN_PX / scale);
       // tavlene må ikke bli så brede at de møtes på midten
       const maxW = cfg.width * 0.47;
       const w0 = textWidth(name, font) + font * 1.1;
@@ -889,29 +844,11 @@ function refreshSigns() {
   placeCamLinks();
 }
 
-/* ---------- Store skilt (bestemor-knappen), huskes i nettleseren ---------- */
-const BIG_KEY = "fergeweb.storeSkilt";
-
-function setBigSigns(on) {
-  bigSigns = on;
-  document.getElementById("map").classList.toggle("bigsigns", on);
-  document.getElementById("bigSigns").setAttribute("aria-pressed", on);
-  try { localStorage.setItem(BIG_KEY, on ? "1" : "0"); } catch {}
-  refreshSigns();
-}
-
-function initBigSigns() {
-  let saved = false;
-  try { saved = localStorage.getItem(BIG_KEY) === "1"; } catch {}
-  document.getElementById("bigSigns").addEventListener("click", () => setBigSigns(!bigSigns));
-  setBigSigns(saved);
-}
-
 /* ---------- Valg av bilde (Enkel / Foto), huskes i nettleseren ---------- */
 const MODE_KEY = "fergeweb.bilde";
 
 /* ---------- Webkamera-lenker på skiltene ---------- */
-/* Lenkene ligger over listen og plasseres over skiltet i bildet som vises nå */
+/* Lenkene plasseres over skiltet i bildet som vises nå */
 function placeCamLinks() {
   const main = document.querySelector("main").getBoundingClientRect();
   const mode = document.getElementById("map").dataset.mode;
@@ -925,10 +862,7 @@ function placeCamLinks() {
     a.href = place.webcam;
     a.title = `Webkamera ved ${place.name} fergeleie (Statens vegvesen)`;
     a.setAttribute("aria-label", a.title);
-    const fancy = '.scene[data-scene="fancy"]';
-    const target = mode === "simple"
-      ? document.querySelector(`.scene[data-scene="simple"] .sign[data-side="${side}"] .board`)
-      : document.querySelector(bigSigns ? `${fancy} .bigsign[data-side="${side}"] .board` : `${fancy} .hot[data-side="${side}"]`);
+    const target = document.querySelector(`.scene[data-scene="${mode}"] .sign[data-side="${side}"] .board`);
     const r = target.getBoundingClientRect();
     Object.assign(a.style, {
       left: `${r.left - main.left}px`, top: `${r.top - main.top}px`,
@@ -952,31 +886,6 @@ function initMode() {
   for (const b of document.querySelectorAll(".images button")) b.addEventListener("click", () => setMode(b.dataset.mode));
 }
 
-/* ---------- Oppsett (Kompakt / Bred), huskes i nettleseren ---------- */
-/* Bred (bildet mellom kolonnene) brukes bare når det er valgt og skjermen er bred nok */
-const LAYOUT_KEY = "fergeweb.oppsett";
-const narrow = matchMedia("(max-width: 760px)");
-let layoutPref = "compact";
-
-function applyLayout() {
-  const layout = layoutPref === "wide" && !narrow.matches ? "wide" : "compact";
-  document.documentElement.dataset.layout = layout;
-  for (const b of document.querySelectorAll(".layouts button")) b.setAttribute("aria-pressed", b.dataset.layout === layoutPref);
-  refreshSigns();
-}
-
-function initLayout() {
-  try { layoutPref = localStorage.getItem(LAYOUT_KEY) === "wide" ? "wide" : "compact"; } catch {}
-  for (const b of document.querySelectorAll(".layouts button")) {
-    b.addEventListener("click", () => {
-      layoutPref = b.dataset.layout;
-      try { localStorage.setItem(LAYOUT_KEY, layoutPref); } catch {}
-      applyLayout();
-    });
-  }
-  narrow.addEventListener("change", applyLayout);
-  applyLayout();
-}
 
 /* Gjør det mulig å "dra" i listen med mus på PC (touch fungerer allerede) */
 function enableMouseDrag(el) {
@@ -1008,9 +917,7 @@ async function main() {
 
   new ResizeObserver(refreshSigns).observe(document.getElementById("map"));
   window.addEventListener("resize", refreshSigns);
-  initBigSigns();
   initMode();
-  initLayout();
 
   const board = new Board(left, right);
 
