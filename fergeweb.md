@@ -9,11 +9,17 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 ## Funksjonalitet (versjon 1)
 
 ### Visning
-- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden (med stedsnavnene i bildet) og en ferge i midten. Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
+- Avganger fra **Misten** vises i venstre kolonne, avganger fra **Festvåg** i høyre kolonne, med et bilde av fjorden og en ferge i midten. Bildet vises i sin helhet. Står det i en høyere kolonne, fylles området over og under med himmel- og sjøfarge.
 - Begge kolonnene ligger i **én felles liste med én scrollbar**, slik at de alltid beveger seg sammen.
 - Hver linje viser en avgang fra Misten og på samme linje **returavgangen** fra Festvåg. Returen er første avgang fra Festvåg etter avgangen fra Misten, og før neste avgang fra Misten. Entur oppgir ikke hvilken ferje som går hvilken tur, så sammenkoblingen er tidsbasert. En avgang uten partner får en egen linje med «–» på den andre siden.
 - Kolonneoverskriftene («Fra Misten / til Festvåg», «Fra Festvåg / til Misten») blir liggende øverst når man scroller.
 - Klokke og tidspunkt for siste oppdatering vises i toppen.
+
+### Valg av bilde
+- I toppen kan man velge mellom to bilder: **Enkel** og **Foto**. Valget huskes i nettleseren, og standard er Foto.
+- **Enkel** er en tegnet fjord med stedsnavnene under fergeleiene. Den følger lys og mørk modus.
+- **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet (lavere fargemetning og lysstyrke). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
+- Valgknappen ligger i toppen og ikke i bildet, fordi listen ligger over bildet på PC.
 
 ### Fergens posisjon
 - Fergen tegnes i bildet der den antas å være akkurat nå, og flyttes hvert sekund. Når den ligger ved kai, ligger den inntil fergeleiet. Under overfart går den i en bue litt nærmere betrakteren, tegnes litt større midt i fjorden, vugger svakt og har kjølvann bak seg.
@@ -84,4 +90,5 @@ Appen bruker Entur Journey Planner v3 (GraphQL), `https://api.entur.io/journey-p
 I prioritert rekkefølge:
 - [x] Visning av fergen i antatt sanntid basert på faktisk avgang, og estimert overfartstid, altså "fergen" skal vises på et sted mellom høyre og venstre side (fergeleier) avhengig av hvor den er beregnet. 
 - [] Konfigurasjon: valg av avgangssted, og deretter automatisk valg av anløpssted (se over).
-- [] Publisering.
+- [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
+- [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
