@@ -29,7 +29,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 
 ### Webkamera
 - Skiltene ved fergeleiene, i både enkelt bilde og foto, er lenker til Statens vegvesens webkamera ved fergeleiet. Lenken åpnes i en ny fane, og skiltet er merket med et lite kameramerke.
-- Webkamera-adressen ligger i `CONFIG` (`webcam`) for hvert fergeleie. Uten adresse blir skiltet ikke en lenke.
+- Webkamera-adressen ligger i `WEBCAMS` for hvert fergeleie. Uten adresse blir skiltet ikke en lenke.
 - Webkameraene kan ikke finnes automatisk. Vegvesenets åpne API for webkamera (DATEX II) krever brukernavn og passord, og det kan ikke ligge i en offentlig fil. API-et som vegvesen.no selv bruker, er internt og ikke ment for andre. Adressene legges derfor inn manuelt, og ved konfigurasjon senere må de inngå i oppsettet for hvert fergeleie.
 
 ### Fergens posisjon
@@ -68,18 +68,27 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Mørk modus følger systemets innstilling.
 
 ## Konfigurasjon
-Vi lar konfigurasjon komme på et senere tidspunkt, for nå skal vi gjøre det sånn at avgangstider for MISTEN er på venstre side, og FESTVÅG er på høyre side (rute 18-538) av et generisk bilde. Når vi kommer til konfigurasjon skal det være mulig å velge et avgangssted, og automatisk skal det komme opp enten valg av anløpssted hvis det finnes flere, eller når det bare er et (som i tilfellet vi bruker som eksempel) blir det automatisk satt anløpssted.
+Opprinnelig var tanken å velge et avgangssted og deretter et anløpssted. Det er erstattet av en liste med ferdige par av fergeleier, hentet fra Entur.
 
-Foreløpig ligger konfigurasjonen hardkodet i `CONFIG` øverst i scriptet i `index.html`:
+### Valg av samband
+- Knappen ⚙ ved tittelen åpner **Velg samband**: en liste med alle bilferger som går mellom nøyaktig to fergeleier (89 par per oktober 2026), med søkefelt.
+- Hvert par vises som i appen: stedsnavn uten «ferjekai», «kai» osv., og linjekoden (for eksempel «Misten – Festvåg · 18-538»). Går flere linjer mellom de samme kaiene, vises alle kodene.
+- Stedet som kommer **senest i alfabetet** (norsk sortering, æ ø å til slutt) står til **venstre**, både i listen og i appen. Listen sorteres A–Å etter dette navnet. Misten–Festvåg står derfor som før.
+- Valgt samband er uthevet i listen. Velger man et annet, lastes siden på nytt med det nye sambandet.
+- Valget **huskes i nettleseren**, og adressen får `?samband=<venstre>-<høyre>` (nummeret i NSR:StopPlace-id-en, f.eks. `?samband=58672-62316`), så et samband kan deles eller bokmerkes. En lenke går foran det som er husket.
+- Ukjente fergeleier i lenken gir standard-sambandet (Misten–Festvåg) med en melding i statusfeltet.
+- Tittelen viser linjekodene fra avgangene som er hentet.
 
-| Felt | Verdi |
-|---|---|
-| `route` | `18-538` |
-| `left` | Misten ferjekai, `NSR:StopPlace:58672` |
-| `right` | Festvåg ferjekai, `NSR:StopPlace:62316` |
-| `webcam` | Webkamera per fergeleie. Misten: `https://www.vegvesen.no/trafikk/vaerveikamera/3001122`, Festvåg: `https://www.vegvesen.no/trafikk/vaerveikamera/3001123` |
+### Per samband
+- **Foto** finnes bare for Misten–Festvåg. Andre samband bruker alltid det enkle bildet, og valget Enkel/Foto skjules.
+- **Webkamera** finnes bare for fergeleier med kjent adresse (`WEBCAMS` i scriptet, i dag Misten og Festvåg). Andre skilt er ikke lenker.
+- Avganger tas med når turen går med båt (`water`) og videre til kaien på motsatt side. Det filtreres ikke lenger på en bestemt linjekode.
 
-Andre justerbare konstanter i samme fil: `DELAY_THRESHOLD` (5 min), `REFRESH_MS` (60 s), `PAGE_FORWARD`, `PAGE_BACK` og `MAX_BACK`.
+### I koden
+- `DEFAULT_PAIR`: standard-sambandet, som også er det fotoet viser.
+- `WEBCAMS`: webkamera-adresse per fergeleie (NSR-id).
+- `CAR_FERRY`: hvilke typer båt (Entur `transportSubmode`) som tas med i listen.
+- Andre justerbare konstanter: `DELAY_THRESHOLD` (5 min), `REFRESH_MS` (60 s), `INITIAL_BACK` (12 t), `PAGE_FORWARD`, `PAGE_BACK` og `MAX_BACK`.
 
 ## Teknologi
 Det er ønskelig at det i første omgang ikke trengs noen servertjeneste utover api for fergeruter, med andre ord webappen skal være "selfcontained".
@@ -98,13 +107,15 @@ Appen bruker Entur Journey Planner v3 (GraphQL), `https://api.entur.io/journey-p
 - Entur tillater kall direkte fra nettleseren (CORS), så det trengs ingen mellomtjener.
 - Header `ET-Client-Name: softstone42-fergeweb` sendes med alle kall.
 - Avganger hentes med `stopPlace.estimatedCalls(startTime, timeRange)`. Det fungerer også for tidspunkter bakover i tid.
-- Avgangene filtreres på transportmåte `water`, linje `18-538` og at turen går videre til kaien på motsatt side. Dette sjekkes med `serviceJourneyEstimatedCalls.next`, som også gir forventet ankomsttid. Turens kaier har egne stoppested-ID-er (for eksempel `NSR:StopPlace:47408`), så sammenligningen gjøres mot kaiens `parent`.
+- Avgangene filtreres på transportmåte `water` og at turen går videre til kaien på motsatt side. Dette sjekkes med `serviceJourneyEstimatedCalls.next`, som også gir forventet ankomsttid. Turens kaier har egne stoppested-ID-er (for eksempel `NSR:StopPlace:47408`), så sammenligningen gjøres mot kaiens `parent`.
+- Listen over samband hentes med `lines(transportModes: [water])` og linjenes `journeyPatterns`. Bilferger der alle mønstrene til sammen bare har to fergeleier (`parent`), blir et par.
 - Merk: AGENTS.md i FergeUtils sier at `NSR:StopPlace:58672` er Moss fergekai. Det stemmer ikke, det er Misten ferjekai.
 
 ## Senere
 I prioritert rekkefølge:
 - [x] Visning av fergen i antatt sanntid basert på faktisk avgang, og estimert overfartstid, altså "fergen" skal vises på et sted mellom høyre og venstre side (fergeleier) avhengig av hvor den er beregnet. 
-- [] Konfigurasjon: valg av avgangssted, og deretter automatisk valg av anløpssted (se over).
+- [x] Konfigurasjon: valg av samband fra en liste med par av fergeleier fra Entur (se Konfigurasjon).
+- [] Fergeleier med flere ruter: samband der fergen går mellom flere enn to fergeleier, f.eks. Bodø – Værøy – Røst – Moskenes (per oktober 2026 54 bilferjelinjer med tre eller flere kaier, som ikke kommer med i listen). Må avklare hvordan slike par vises og hvordan fergens posisjon beregnes når den stopper underveis.
 - [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
 - [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
 - [x] Fra alfa-tester: skilt ved hvert fergeleie i enkelt bilde i stedet for tekst nederst.

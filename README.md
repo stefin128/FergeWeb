@@ -1,6 +1,6 @@
 # FergeWeb
 
-Fergetider for ferjesambandet Misten – Festvåg (rute 18-538) i en enkel webapp.
+Fergetider for norske bilferjesamband i en enkel webapp. Standard er Misten – Festvåg (rute 18-538), og andre samband velges med ⚙.
 
 - Avganger fra begge sider vises side om side. Hver avgang står på samme linje som returen.
 - Listen starter ved neste avgang. Dra opp for senere avganger, dra ned for tidligere.

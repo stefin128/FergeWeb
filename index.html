@@ -50,6 +50,38 @@
   }
   .modes button[aria-pressed="true"] { background: var(--accent); color: #fff; }
   header .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .modes[hidden] { display: none; }
+  .modes[hidden] + .clock { margin-left: auto; }
+  .cfg {
+    align-self: center; border: 1px solid var(--line); border-radius: 8px; background: transparent;
+    color: var(--text); line-height: 0; padding: 4px; cursor: pointer;
+  }
+  .cfg:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Dialog for valg av samband */
+  #pairDialog {
+    width: min(560px, calc(100vw - 32px)); max-height: min(80vh, 720px); padding: 0;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text);
+    box-shadow: 0 10px 40px rgb(0 0 0 / .3);
+  }
+  #pairDialog[open] { display: flex; flex-direction: column; }
+  #pairDialog::backdrop { background: rgb(0 0 0 / .45); }
+  .dlg-head { display: flex; align-items: center; padding: 12px 16px 8px; }
+  .dlg-head h2 { margin: 0; font-size: 1.1rem; }
+  .dlg-close { margin-left: auto; border: 0; background: transparent; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+  #pairSearch {
+    margin: 0 16px 10px; padding: 8px 10px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .pairlist { overflow-y: auto; border-top: 1px solid var(--line); }
+  .pair {
+    display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+    padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: transparent;
+    color: var(--text); font: inherit; cursor: pointer;
+  }
+  .pair:hover, .pair:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .pair[aria-current="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); font-weight: 600; }
+  .pair .pc { margin-left: auto; color: var(--muted); font-size: .85rem; white-space: nowrap; }
   header .status { font-size: .85rem; color: var(--muted); }
 
   /* Bildet øverst og én felles liste med to kolonner under. På store skjermer begrenses bredden. */
@@ -159,6 +191,8 @@
   .loader-row.bottom > div { border-bottom: 1px solid var(--line); border-radius: 0 0 10px 10px; }
 
   .nowline { position: relative; height: 0; border-top: 2px solid var(--now); margin-top: -1px; z-index: 1; }
+  /* rett under en dagoverskrift: litt luft, så klokkemerket på streken ikke skjules av overskriften */
+  .day + .nowline { margin-top: 11px; }
   .nowline span {
     position: absolute; left: 50%; transform: translateX(-50%); top: -10px; background: var(--now); color: #fff;
     font-size: .7rem; font-weight: 700; padding: 1px 6px; border-radius: 8px;
@@ -194,6 +228,12 @@
 <body>
 <header>
   <h1 id="title">Fergetider</h1>
+  <button type="button" class="cfg" id="pairButton" title="Velg samband" aria-label="Velg samband">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
   <span class="status" id="status"></span>
   <div class="modes images" role="group" aria-label="Bilde">
     <button type="button" data-mode="simple" aria-pressed="false">Enkel</button>
@@ -295,16 +335,37 @@
   <a class="camlink" id="camRight" target="_blank" rel="noopener" hidden><span aria-hidden="true">📷</span></a>
 </main>
 
+<!-- Valg av samband -->
+<dialog id="pairDialog" aria-labelledby="pairTitle">
+  <div class="dlg-head">
+    <h2 id="pairTitle">Velg samband</h2>
+    <button type="button" class="dlg-close" id="pairClose" aria-label="Lukk">✕</button>
+  </div>
+  <input type="search" id="pairSearch" placeholder="Søk etter sted …" autocomplete="off" aria-label="Søk etter sted">
+  <div class="pairlist" id="pairList"></div>
+</dialog>
+
 <script>
 "use strict";
 
-/* ---------- Konfigurasjon (hardkodet i første versjon) ---------- */
-const CONFIG = {
-  route: "18-538",
-  // webcam: side hos Statens vegvesen med webkamera ved fergeleiet (null = ingen lenke)
-  left:  { id: "NSR:StopPlace:58672", name: "Misten", webcam: "https://www.vegvesen.no/trafikk/vaerveikamera/3001122" },
-  right: { id: "NSR:StopPlace:62316", name: "Festvåg", webcam: "https://www.vegvesen.no/trafikk/vaerveikamera/3001123" },
+/* ---------- Samband (konfigurasjon) ---------- */
+// Standard samband, og det fotoet i bildet viser. Andre samband bruker det enkle bildet.
+const DEFAULT_PAIR = {
+  left:  { id: "NSR:StopPlace:58672", name: "Misten" },
+  right: { id: "NSR:StopPlace:62316", name: "Festvåg" },
 };
+// Webkamera hos Statens vegvesen ved kjente fergeleier. Kan ikke finnes automatisk,
+// fordi Vegvesenets åpne API krever innlogging.
+const WEBCAMS = {
+  "NSR:StopPlace:58672": "https://www.vegvesen.no/trafikk/vaerveikamera/3001122",   // Misten
+  "NSR:StopPlace:62316": "https://www.vegvesen.no/trafikk/vaerveikamera/3001123",   // Festvåg
+};
+// Bilferger som vises i listen over samband (Entur transportSubmode)
+const CAR_FERRY = new Set(["localCarFerry", "nationalCarFerry", "internationalCarFerry", "highSpeedVehicleService"]);
+const PAIR_KEY = "fergeweb.samband";
+
+// Fylles ut av resolveConfig() ved oppstart: { left, right, photo }, der left/right er { id, name, webcam }
+const CONFIG = { left: null, right: null, photo: false };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -345,19 +406,21 @@ query($id: String!, $start: DateTime!, $range: Int!) {
   }
 }`;
 
-async function fetchCalls(from, to, startMs, rangeMs) {
+async function gql(query, variables = {}) {
   const res = await fetch(API, {
     method: "POST",
     headers: { "Content-Type": "application/json", "ET-Client-Name": CLIENT_NAME },
-    body: JSON.stringify({
-      query: QUERY,
-      variables: { id: from.id, start: new Date(startMs).toISOString(), range: Math.round(rangeMs / 1000) },
-    }),
+    body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0].message);
-  const calls = json.data?.stopPlace?.estimatedCalls ?? [];
+  return json.data;
+}
+
+async function fetchCalls(from, to, startMs, rangeMs) {
+  const data = await gql(QUERY, { id: from.id, start: new Date(startMs).toISOString(), range: Math.round(rangeMs / 1000) });
+  const calls = data?.stopPlace?.estimatedCalls ?? [];
   return calls.map(c => toDeparture(c, from, to)).filter(Boolean);
 }
 
@@ -366,7 +429,6 @@ const isStop = (sp, id) => sp && (sp.id === id || sp.parent?.id === id);
 function toDeparture(c, from, to) {
   const line = c.serviceJourney?.journeyPattern?.line;
   if (!line || line.transportMode !== "water") return null;
-  if (CONFIG.route && line.publicCode !== CONFIG.route) return null;
 
   // Må gå til motsatt side etter avgangsstedet
   const arr = (c.serviceJourneyEstimatedCalls?.next ?? []).find(n => isStop(n.quay?.stopPlace, to.id));
@@ -384,6 +446,7 @@ function toDeparture(c, from, to) {
     aimed, expected, arrival,
     realtime: c.realtime,
     cancelled: c.cancellation,
+    code: line.publicCode,
   };
 }
 
@@ -606,6 +669,7 @@ class Board {
     let top = nowline.offsetTop - this.stickyHeight();
     const prev = nowline.previousElementSibling;
     if (prev?.matches(".row[data-key]")) top -= prev.offsetHeight;
+    else top -= 11;   // ny dag: streken har 11 px luft under dagoverskriften (se .day + .nowline)
     this.scroller.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
   }
 
@@ -871,17 +935,20 @@ function placeCamLinks() {
   }
 }
 
-function setMode(mode) {
+function setMode(mode, remember = true) {
   if (!SCENES[mode]) mode = "fancy";
   document.getElementById("map").dataset.mode = mode;
   for (const b of document.querySelectorAll(".images button")) b.setAttribute("aria-pressed", b.dataset.mode === mode);
-  try { localStorage.setItem(MODE_KEY, mode); } catch {}
+  if (remember) try { localStorage.setItem(MODE_KEY, mode); } catch {}
   refreshSigns();
 }
 
 function initMode() {
   let saved = null;
   try { saved = localStorage.getItem(MODE_KEY); } catch {}
+  // fotoet viser bare standard-sambandet; andre samband får alltid det enkle bildet
+  document.querySelector(".images").hidden = !CONFIG.photo;
+  if (!CONFIG.photo) { setMode("simple", false); return; }
   setMode(saved ?? "fancy");
   for (const b of document.querySelectorAll(".images button")) b.addEventListener("click", () => setMode(b.dataset.mode));
 }
@@ -903,6 +970,115 @@ function enableMouseDrag(el) {
   window.addEventListener("pointerup", () => { down = false; el.classList.remove("dragging"); });
 }
 
+/* ---------- Valg av samband ---------- */
+// "Misten ferjekai" -> "Misten"
+const shortName = n => n.replace(/\s+(ferjekai|fergekai|ferjeleie|fergeleie|ferjeterminal|fergeterminal|hurtigbåtkai|kai|brygge)$/i, "");
+const byName = (a, b) => a.name.localeCompare(b.name, "nb");
+// Stedet som kommer senest i alfabetet, står til venstre
+const orderPair = (a, b) => (byName(a, b) >= 0 ? [a, b] : [b, a]);
+const nsrNum = id => id.replace("NSR:StopPlace:", "");
+
+/* Finn samband ved oppstart: lenke (?samband=58672-62316), ellers lagret i nettleseren, ellers standard */
+async function resolveConfig() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(PAIR_KEY)); } catch {}
+  const m = new URLSearchParams(location.search).get("samband")?.match(/^(\d+)-(\d+)$/);
+  const ids = m ? [`NSR:StopPlace:${m[1]}`, `NSR:StopPlace:${m[2]}`]
+            : saved?.left && saved?.right ? [saved.left.id, saved.right.id]
+            : [DEFAULT_PAIR.left.id, DEFAULT_PAIR.right.id];
+
+  // navn vi allerede kjenner; ellers hentes de fra Entur
+  const known = new Map([DEFAULT_PAIR.left, DEFAULT_PAIR.right, saved?.left, saved?.right].filter(Boolean).map(p => [p.id, p]));
+  let places = ids.map(id => known.get(id));
+  if (places.some(p => !p)) {
+    const d = await gql("query($a: String!, $b: String!) { a: stopPlace(id: $a) { id name } b: stopPlace(id: $b) { id name } }",
+                        { a: ids[0], b: ids[1] });
+    if (!d.a || !d.b) throw new Error("Ukjent fergeleie i lenken");
+    places = [d.a, d.b].map(p => ({ id: p.id, name: shortName(p.name) }));
+  }
+  const [left, right] = orderPair(...places);
+  CONFIG.left = { ...left, webcam: WEBCAMS[left.id] ?? null };
+  CONFIG.right = { ...right, webcam: WEBCAMS[right.id] ?? null };
+  CONFIG.photo = left.id === DEFAULT_PAIR.left.id && right.id === DEFAULT_PAIR.right.id;
+
+  try { localStorage.setItem(PAIR_KEY, JSON.stringify({ left, right })); } catch {}
+  // adressen viser valgt samband, så den kan deles eller bokmerkes
+  history.replaceState(null, "", `?samband=${nsrNum(left.id)}-${nsrNum(right.id)}`);
+}
+
+/* Alle bilferger med nøyaktig to fergeleier, som par sortert etter navnet til venstre */
+let pairsPromise = null;
+function loadPairs() {
+  pairsPromise ??= gql(`{ lines(transportModes: [water]) { publicCode transportSubmode
+      journeyPatterns { quays { stopPlace { id name parent { id name } } } } } }`).then(d => {
+    const pairs = new Map();
+    for (const line of d.lines) {
+      if (!CAR_FERRY.has(line.transportSubmode)) continue;
+      const stops = new Map();
+      for (const jp of line.journeyPatterns) for (const q of jp.quays) {
+        const sp = q.stopPlace.parent ?? q.stopPlace;
+        stops.set(sp.id, { id: sp.id, name: shortName(sp.name) });
+      }
+      if (stops.size !== 2) continue;
+      const [left, right] = orderPair(...stops.values());
+      const key = `${left.id}|${right.id}`;
+      const pair = pairs.get(key) ?? { left, right, codes: new Set() };
+      if (line.publicCode) pair.codes.add(line.publicCode);
+      pairs.set(key, pair);
+    }
+    return [...pairs.values()].sort((a, b) => byName(a.left, b.left) || byName(a.right, b.right));
+  }).catch(e => { pairsPromise = null; throw e; });
+  return pairsPromise;
+}
+
+function choosePair(pair) {
+  try { localStorage.setItem(PAIR_KEY, JSON.stringify({ left: pair.left, right: pair.right })); } catch {}
+  // last siden på nytt med nytt samband, så alt starter rent
+  location.search = `?samband=${nsrNum(pair.left.id)}-${nsrNum(pair.right.id)}`;
+}
+
+function initPairDialog() {
+  const dlg = document.getElementById("pairDialog");
+  const search = document.getElementById("pairSearch");
+  const list = document.getElementById("pairList");
+  let pairs = [];
+
+  const render = () => {
+    const q = search.value.trim().toLocaleLowerCase("nb");
+    const shown = pairs.filter(p => !q || `${p.left.name} ${p.right.name}`.toLocaleLowerCase("nb").includes(q));
+    list.replaceChildren(...shown.map(p => {
+      const b = el("button", "pair");
+      b.type = "button";
+      const name = el("span", "pn"), code = el("span", "pc");
+      name.textContent = `${p.left.name} – ${p.right.name}`;   // tekst fra Entur settes som tekst, ikke HTML
+      code.textContent = [...p.codes].join(", ");
+      b.append(name, code);
+      if (p.left.id === CONFIG.left.id && p.right.id === CONFIG.right.id) b.setAttribute("aria-current", "true");
+      b.addEventListener("click", () => choosePair(p));
+      return b;
+    }));
+    if (!shown.length) list.append(el("div", "msg", pairs.length ? "Ingen treff" : ""));
+  };
+
+  document.getElementById("pairButton").addEventListener("click", async () => {
+    dlg.showModal();
+    search.value = "";
+    if (pairs.length) { render(); list.querySelector("[aria-current]")?.scrollIntoView({ block: "center" }); return; }
+    list.replaceChildren(el("div", "msg", "Henter samband …"));
+    try {
+      pairs = await loadPairs();
+      render();
+      list.querySelector("[aria-current]")?.scrollIntoView({ block: "center" });
+    } catch (e) {
+      list.replaceChildren(el("div", "msg error", "Kunne ikke hente samband"));
+    }
+  });
+  search.addEventListener("input", render);
+  document.getElementById("pairClose").addEventListener("click", () => dlg.close());
+  // klikk utenfor dialogen lukker den
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+}
+
 /* ---------- Oppstart ---------- */
 const statusEl = document.getElementById("status");
 function setStatus(t) { statusEl.textContent = t; }
@@ -910,10 +1086,27 @@ function setStatus(t) { statusEl.textContent = t; }
 const fmtClock = new Intl.DateTimeFormat("nb-NO", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 function tickClock() { document.getElementById("clock").textContent = fmtClock.format(Date.now()); }
 
-async function main() {
-  const { left, right, route } = CONFIG;
+function setTitle(codes = []) {
+  const { left, right } = CONFIG;
   document.title = `Ferge ${left.name} – ${right.name}`;
-  document.getElementById("title").textContent = `${left.name} – ${right.name}${route ? ` (${route})` : ""}`;
+  document.getElementById("title").textContent =
+    `${left.name} – ${right.name}${codes.length ? ` (${codes.join(", ")})` : ""}`;
+}
+
+async function main() {
+  let note = "";   // vises i statusfeltet hvis lenken ikke kunne brukes
+  try { await resolveConfig(); }
+  catch (e) {
+    // ugyldig lenke e.l.: bruk standard samband
+    try { localStorage.removeItem(PAIR_KEY); } catch {}
+    Object.assign(CONFIG, { left: { ...DEFAULT_PAIR.left }, right: { ...DEFAULT_PAIR.right }, photo: true });
+    CONFIG.left.webcam = WEBCAMS[CONFIG.left.id]; CONFIG.right.webcam = WEBCAMS[CONFIG.right.id];
+    history.replaceState(null, "", location.pathname);
+    note = "Fant ikke sambandet i lenken, viser standard";
+  }
+  const { left, right } = CONFIG;
+  setTitle();
+  initPairDialog();
 
   new ResizeObserver(refreshSigns).observe(document.getElementById("map"));
   window.addEventListener("resize", refreshSigns);
@@ -926,7 +1119,10 @@ async function main() {
 
   try {
     await board.init();
-    setStatus(`Oppdatert ${hhmm(Date.now())}`);
+    setStatus(note || `Oppdatert ${hhmm(Date.now())}`);
+    // linjekode(r) fra avgangene, f.eks. "18-538"
+    const codes = new Set([...board.L.values(), ...board.R.values()].map(d => d.code).filter(Boolean));
+    setTitle([...codes].sort());
   } catch { setStatus("Noe feilet ved henting"); }
   board.updateNowButton();
   updateFerry(board);
