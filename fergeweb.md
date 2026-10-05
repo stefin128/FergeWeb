@@ -20,6 +20,12 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - **Enkel** er en tegnet fjord med et skilt med stedsnavnet ved hvert fergeleie (se Store skilt). Den følger lys og mørk modus.
 - **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
 
+### Døgnrytme i bildet
+- Fargetonen i bildet følger sola ved fergeleiet til **venstre**. Uten farge på dagen (sol over 8°), varmt gyllent når sola står lavt, lilla-blått i skumringen og mørkeblått om natta (sol under −12°). Overgangene er gradvise.
+- Solhøyden regnes ut i appen (samme formel som biblioteket SunCalc) ut fra klokkeslett og fergeleiets posisjon fra Entur. Ingen ekstra API trengs, og det virker også med midnattssol og mørketid. For Misten gir det soloppgang 07:26 og solnedgang 18:13 den 5. oktober.
+- Fargelaget ligger under fergen og skiltene, så de er like lette å se hele døgnet. Det oppdateres hvert minutt.
+- **Navigasjonslys** når sola er nede: hvitt topplys i masta, og sidelys når fergen er underveis. Fergen sees fra siden, så bare siden som vender mot oss synes: **grønt** (styrbord) når den går mot høyre og **rødt** (babord) når den går mot venstre. Ved kai vises bare topplyset.
+
 ### Store skilt
 - Skiltene ved fergeleiene vises alltid med stor skrift, slik at også eldre brukere lett ser hvilket fergeleie som er på hver side av bildet. Dette er ikke valgbart.
 - Skriftstørrelsen tilpasses hvor stort bildet faktisk vises, med mål om ca. 18 px tekst på skjermen. Skiltene blir derfor lesbare også på mobil.
@@ -129,6 +135,7 @@ I prioritert rekkefølge:
 - [x] Fergeleier med flere ruter: par fra bilferger med flere kaier er med i listen, og avganger med flere stopp viser første stopp og alle stopp ved trykk på ikonet (se Konfigurasjon).
 - [] Fergens posisjon på turer med stopp underveis: i dag tegnes fergen rett over fra kai til kai, også når den går innom en annen kai først. På Ørnes–Meløysund går 13:35 direkte (35 min), mens 07:35 går via Vassdalsvik (50 min), men begge tegnes som én rett overfart.
 - [] Mellomlagring (cache) av avganger, så appen fortsatt viser rutetider ved nettbrudd eller når dekningen faller ut på mobil. Kan også redusere antall kall mot Entur på ruter med få avganger (f.eks. Ørnes–Bolga, ca. 30 kall ved første lasting).
+- [] Webkamera for alle fergeleier: finne et API som gir webkamera ved valgt fergeleie, så skiltet kan bli lenke (med kameraikon) for alle samband og ikke bare Misten–Festvåg. Kjent så langt: Statens vegvesens åpne API (DATEX II) krever brukernavn og passord, som ikke kan ligge i en offentlig fil. API-et vegvesen.no selv bruker, er internt og ikke ment for andre (se Webkamera).
 - [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
 - [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
 - [x] Fra alfa-tester: skilt ved hvert fergeleie i enkelt bilde i stedet for tekst nederst.
