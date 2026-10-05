@@ -173,6 +173,28 @@
   .cell.cancelled .t { text-decoration: line-through; color: var(--cancel); }
   .cell .tag { font-size: .75rem; font-weight: 600; color: var(--cancel); }
   .cell .tag.delay { color: var(--delay); }
+  .cell .via { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .stopsbtn {
+    display: inline-flex; align-items: center; padding: 3px 4px; margin-left: -4px; cursor: pointer;
+    border: 0; border-radius: 6px; background: transparent; color: var(--accent); align-self: center;
+  }
+  .stopsbtn:hover, .stopsbtn:focus-visible { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .cell.past .via, .cell.past .stopsbtn { color: var(--past); }
+  .stopspop {
+    position: fixed; z-index: 10; min-width: 170px; max-width: calc(100vw - 16px); padding: 8px 12px;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 6px 20px rgb(0 0 0 / .2); font-size: .9rem; font-variant-numeric: tabular-nums;
+  }
+  .stopspop[hidden] { display: none; }
+  .ferryicon { cursor: pointer; transition: transform 1s linear; }
+  .ferryicon rect { fill: var(--panel); stroke: var(--accent); stroke-width: 1.5; }
+  .ferryicon path { stroke: var(--accent); stroke-width: 1.6; }
+  .ferryicon circle { fill: var(--accent); }
+  .ferryicon circle.mid { fill: var(--panel); stroke: var(--accent); stroke-width: 1.6; }
+  .ferryicon:hover rect { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+  .stopspop .sp-head { color: var(--muted); font-size: .8rem; margin-bottom: 4px; }
+  .stopspop .sp-stop span { display: inline-block; width: 3.2em; color: var(--muted); }
+  .stopspop .sp-stop.target { font-weight: 700; }
   .cell.none { color: var(--past); }
 
   .day { position: sticky; top: var(--heads-h); z-index: 2; }
@@ -268,6 +290,7 @@
       <!-- Skilt ved hvert fergeleie: stolpe fra kaia og en tavle med stedsnavnet -->
       <g class="sign" data-side="l"><rect class="pole"/><rect class="board"/><text></text></g>
       <g class="sign" data-side="r"><rect class="pole"/><rect class="board"/><text></text></g>
+      <g class="ferryicons"></g>
     </svg>
 
     <!-- Foto: dempet bilde, med kaier/skilt og fergen fremhevet i full farge -->
@@ -298,6 +321,7 @@
       <g class="sign" data-side="l"><rect class="board"/><text></text></g>
       <g class="sign" data-side="r"><rect class="board"/><text></text></g>
       <g class="ferries"></g>
+      <g class="ferryicons"></g>
     </svg>
 
     <!-- Fergen og kjølvannet, felles for begge bildene -->
@@ -335,6 +359,9 @@
   <a class="camlink" id="camRight" target="_blank" rel="noopener" hidden><span aria-hidden="true">📷</span></a>
 </main>
 
+<!-- Alle stopp på en tur (vises ved klikk på ikonet) -->
+<div class="stopspop" id="stopsPop" role="dialog" aria-label="Alle stopp" hidden></div>
+
 <!-- Valg av samband -->
 <dialog id="pairDialog" aria-labelledby="pairTitle">
   <div class="dlg-head">
@@ -360,8 +387,9 @@ const WEBCAMS = {
   "NSR:StopPlace:58672": "https://www.vegvesen.no/trafikk/vaerveikamera/3001122",   // Misten
   "NSR:StopPlace:62316": "https://www.vegvesen.no/trafikk/vaerveikamera/3001123",   // Festvåg
 };
-// Bilferger som vises i listen over samband (Entur transportSubmode)
-const CAR_FERRY = new Set(["localCarFerry", "nationalCarFerry", "internationalCarFerry", "highSpeedVehicleService"]);
+// Bilferger som vises i listen over samband (Entur transportSubmode).
+// nationalCarFerry (Hurtigruten/Havila, 35 stopp) er utelatt: det er kystruter, ikke fergesamband.
+const CAR_FERRY = new Set(["localCarFerry", "internationalCarFerry", "highSpeedVehicleService"]);
 const PAIR_KEY = "fergeweb.samband";
 
 // Fylles ut av resolveConfig() ved oppstart: { left, right, photo }, der left/right er { id, name, webcam }
@@ -376,6 +404,8 @@ const INITIAL_FORWARD = 30 * HOUR;
 const PAGE_FORWARD = 24 * HOUR;     // ved scroll videre fremover
 const PAGE_BACK = 12 * HOUR;        // ved scroll bakover
 const MAX_BACK = 7 * 24 * HOUR;     // ikke lenger bakover enn dette
+const MAX_FORWARD = 60 * 24 * HOUR; // ikke lenger fremover enn dette
+const MAX_PAGE = 7 * 24 * HOUR;     // største periode i én henting (når det er glissent med avganger)
 const REFRESH_MS = 60e3;            // sanntidsoppdatering
 const DELAY_THRESHOLD = 5 * 60e3;   // avvik fra rutetid som vises som "Ny tid"
 
@@ -384,7 +414,7 @@ const QUERY = `
 query($id: String!, $start: DateTime!, $range: Int!) {
   stopPlace(id: $id) {
     name
-    estimatedCalls(startTime: $start, timeRange: $range, numberOfDepartures: 300,
+    estimatedCalls(startTime: $start, timeRange: $range, numberOfDepartures: 1000, whiteListedModes: [water],
                    includeCancelledTrips: true, arrivalDeparture: departures) {
       date
       aimedDepartureTime
@@ -393,11 +423,11 @@ query($id: String!, $start: DateTime!, $range: Int!) {
       cancellation
       serviceJourney {
         id
-        journeyPattern { line { publicCode transportMode } }
+        journeyPattern { line { publicCode transportMode transportSubmode } }
       }
       serviceJourneyEstimatedCalls {
         next {
-          quay { stopPlace { id parent { id } } }
+          quay { stopPlace { id name parent { id name } } }
           aimedArrivalTime
           expectedArrivalTime
         }
@@ -428,7 +458,8 @@ const isStop = (sp, id) => sp && (sp.id === id || sp.parent?.id === id);
 
 function toDeparture(c, from, to) {
   const line = c.serviceJourney?.journeyPattern?.line;
-  if (!line || line.transportMode !== "water") return null;
+  // bare bilferger (ikke hurtigbåter og passasjerbåter som går mellom de samme kaiene)
+  if (!line || line.transportMode !== "water" || !CAR_FERRY.has(line.transportSubmode)) return null;
 
   // Må gå til motsatt side etter avgangsstedet
   const arr = (c.serviceJourneyEstimatedCalls?.next ?? []).find(n => isStop(n.quay?.stopPlace, to.id));
@@ -442,11 +473,19 @@ function toDeparture(c, from, to) {
   if (!(arrival > expected)) arrival = arrAimed + (expected - aimed);
 
   return {
-    key: `${c.serviceJourney.id}|${c.date}`,
+    // samme tur kan gå fra samme kai to ganger (rundtur), så avgangstiden er med i nøkkelen
+    key: `${c.serviceJourney.id}|${c.date}|${c.aimedDepartureTime}`,
     aimed, expected, arrival,
     realtime: c.realtime,
     cancelled: c.cancellation,
     code: line.publicCode,
+    from: from.name,
+    // alle stopp videre på turen, med rutetid
+    stops: c.serviceJourneyEstimatedCalls.next.map(n => ({
+      name: shortName((n.quay.stopPlace.parent ?? n.quay.stopPlace).name),
+      time: Date.parse(n.aimedArrivalTime),
+      target: isStop(n.quay.stopPlace, to.id),
+    })),
   };
 }
 
@@ -499,6 +538,11 @@ function until(ms) {
   return `om ${h} t ${m} min`;
 }
 
+// tekst fra Entur som settes inn i HTML
+const esc = t => String(t).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+// ikon for "alle stopp": tre stopp på en linje
+const ROUTE_ICON = `<svg viewBox="0 0 24 12" width="22" height="11" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="1.6"/><circle cx="3.5" cy="6" r="2.6" fill="currentColor"/><circle cx="12" cy="6" r="2.6" fill="var(--panel)" stroke="currentColor" stroke-width="1.6"/><circle cx="20.5" cy="6" r="2.6" fill="currentColor"/></svg>`;
+
 const isPast = (d, now) => Math.max(d.expected, d.aimed) < now - 60e3;
 
 function el(tag, cls, html) {
@@ -518,8 +562,8 @@ class Board {
     this.btn = document.getElementById("tonow");
     this.L = new Map(); this.R = new Map();
     this.loadedFrom = 0; this.loadedTo = 0;
-    this.loadingBack = false; this.loadingFwd = false;
-    this.backExhausted = false;
+    this.backPromise = null; this.fwdPromise = null;   // pågående henting bakover/fremover
+    this.backExhausted = false; this.fwdExhausted = false;
 
     document.getElementById("headLeft").textContent = `Fra ${left.name}`;
     document.getElementById("subLeft").textContent = `til ${right.name}`;
@@ -531,7 +575,14 @@ class Board {
       document.documentElement.style.setProperty("--heads-h", `${this.heads.offsetHeight}px`)
     ).observe(this.heads);
 
-    this.scroller.addEventListener("scroll", () => this.onScroll(), { passive: true });
+    this.scroller.addEventListener("scroll", () => { this.hideStops(); this.onScroll(); }, { passive: true });
+    this.pop = document.getElementById("stopsPop");
+    this.rowsEl.addEventListener("click", e => {
+      const b = e.target.closest(".stopsbtn");
+      if (b) { e.stopPropagation(); this.showStops(b); }
+    });
+    document.addEventListener("click", e => { if (!this.pop.contains(e.target)) this.hideStops(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") this.hideStops(); });
     this.btn.addEventListener("click", () => this.scrollToNow(true));
     enableMouseDrag(this.scroller);
   }
@@ -558,6 +609,7 @@ class Board {
       this.merge(await this.fetchWindow(this.loadedFrom, this.loadedTo - this.loadedFrom));
       this.render();
       this.scrollToNow(false);
+      this.fill();   // glisne ruter: hent mer til listen kan scrolles
     } catch (e) {
       this.rowsEl.innerHTML = `<div class="row"><div class="msg error">Kunne ikke hente avganger<br><small>${e.message}</small></div></div>`;
       throw e;
@@ -610,7 +662,7 @@ class Board {
     }
     if (rows.length && !nowPlaced) frag.append(nowLine());
 
-    frag.append(loaderRow("bottom", "Dra opp for flere avganger"));
+    frag.append(loaderRow("bottom", this.fwdExhausted ? "Ingen flere avganger" : "Dra opp for flere avganger"));
     this.rowsEl.replaceChildren(frag);
   }
 
@@ -627,12 +679,37 @@ class Board {
     const shown = delayed ? d.expected : d.aimed;
     const tag = d.cancelled ? `<span class="tag">Innstilt</span>`
               : delayed ? `<span class="tag delay">Ny tid</span>` : "";
+    // flere stopp: vis første stopp og et ikon som viser alle stopp
+    const multi = d.stops.length > 1;
+    const all = multi ? d.stops.map(x => `${hhmm(x.time)} ${x.name}`).join(", ") : "";
+    const via = multi
+      ? `<span class="via">→ ${esc(d.stops[0].name)}</span>` +
+        `<button type="button" class="stopsbtn" data-key="${esc(d.key)}" title="${esc(all)}" aria-label="Alle stopp: ${esc(all)}">${ROUTE_ICON}</button>`
+      : "";
     c.innerHTML =
       `<span class="t">${delayed ? `<span class="old">${hhmm(d.aimed)}</span>` : ""}${hhmm(shown)}</span>` +
-      tag +
+      tag + via +
       `<span class="until">${past || d.cancelled ? "" : until(shown)}</span>`;
     return c;
   }
+
+  /* Viser alle stopp på turen i en liten boks under ikonet (i listen eller over fergen) */
+  showStops(btn) {
+    const d = this.L.get(btn.dataset.key) ?? this.R.get(btn.dataset.key);
+    if (!d?.stops.length) return;
+    if (!this.pop.hidden && this.pop.dataset.key === d.key) { this.hideStops(); return; }
+    this.pop.dataset.key = d.key;
+    this.pop.innerHTML =
+      `<div class="sp-head">Fra ${esc(d.from)} ${hhmm(d.aimed)}</div>` +
+      d.stops.map(x => `<div class="sp-stop${x.target ? " target" : ""}"><span>${hhmm(x.time)}</span>${esc(x.name)}</div>`).join("");
+    this.pop.hidden = false;
+    const r = btn.getBoundingClientRect(), w = this.pop.offsetWidth, h = this.pop.offsetHeight;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+    const below = r.bottom + 6 + h < innerHeight;
+    Object.assign(this.pop.style, { left: `${left}px`, top: `${below ? r.bottom + 6 : r.top - h - 6}px` });
+  }
+
+  hideStops() { if (this.pop && !this.pop.hidden) this.pop.hidden = true; }
 
   /* Høyden på det som klistrer seg øverst (kolonneoverskrift + dagoverskrift) */
   stickyHeight() {
@@ -674,10 +751,34 @@ class Board {
   }
 
   onScroll() {
-    const s = this.scroller;
-    if (s.scrollTop + s.clientHeight > s.scrollHeight - 300) this.loadForward();
-    if (s.scrollTop < 150) this.loadBack();
+    this.fill();
     this.updateNowButton();
+  }
+
+  /*
+   * Hent mer til listen er lang nok til å scrolle i begge retninger. Uten dette kan en glissen rute
+   * (f.eks. Ørnes–Bolga) få så få avganger at listen ikke kan scrolles, og da kommer det aldri mer.
+   * Perioder uten avganger gir større og større hentinger, opp til MAX_PAGE.
+   */
+  async fill() {
+    if (this.filling) return;
+    this.filling = true;
+    let fwdRange = PAGE_FORWARD, backRange = PAGE_BACK;
+    try {
+      for (let i = 0; i < 30; i++) {
+        const s = this.scroller;
+        const needFwd = !this.fwdExhausted && s.scrollTop + s.clientHeight > s.scrollHeight - 300;
+        const needBack = !this.backExhausted && s.scrollTop < 150;
+        if (!needFwd && !needBack) break;
+        const before = this.L.size + this.R.size;
+        await Promise.all([needFwd && this.loadForward(fwdRange), needBack && this.loadBack(backRange)]);
+        if (this.L.size + this.R.size === before) {   // ingenting nytt: hent lengre neste gang
+          if (needFwd) fwdRange = Math.min(fwdRange * 2, MAX_PAGE);
+          if (needBack) backRange = Math.min(backRange * 2, MAX_PAGE);
+        }
+      }
+    } catch (e) { setStatus(`Feil: ${e.message}`); }
+    finally { this.filling = false; }
   }
 
   updateNowButton() {
@@ -687,29 +788,27 @@ class Board {
     this.btn.hidden = r.top >= s.top + this.stickyHeight() - 2 && r.top < s.bottom;   // litt slingringsmonn i kanten
   }
 
-  async loadForward() {
-    if (this.loadingFwd) return;
-    this.loadingFwd = true;
-    const start = this.loadedTo;
-    try {
-      this.merge(await this.fetchWindow(start, PAGE_FORWARD));
-      this.loadedTo = start + PAGE_FORWARD;
+  loadForward(range = PAGE_FORWARD) {
+    if (this.fwdExhausted) return Promise.resolve();
+    return this.fwdPromise ??= (async () => {
+      const start = this.loadedTo;
+      const end = Math.min(start + range, Date.now() + MAX_FORWARD);
+      this.merge(await this.fetchWindow(start, end - start));
+      this.loadedTo = end;
+      if (end >= Date.now() + MAX_FORWARD) this.fwdExhausted = true;
       this.renderKeepingPosition();
-    } catch (e) { setStatus(`Feil: ${e.message}`); }
-    finally { this.loadingFwd = false; }
+    })().finally(() => { this.fwdPromise = null; });
   }
 
-  async loadBack() {
-    if (this.loadingBack || this.backExhausted) return;
-    this.loadingBack = true;
-    const start = this.loadedFrom - PAGE_BACK;
-    try {
-      this.merge(await this.fetchWindow(start, PAGE_BACK));
+  loadBack(range = PAGE_BACK) {
+    if (this.backExhausted) return Promise.resolve();
+    return this.backPromise ??= (async () => {
+      const start = Math.max(this.loadedFrom - range, Date.now() - MAX_BACK);
+      this.merge(await this.fetchWindow(start, this.loadedFrom - start));
       this.loadedFrom = start;
-      if (Date.now() - start >= MAX_BACK) this.backExhausted = true;
+      if (start <= Date.now() - MAX_BACK) this.backExhausted = true;
       this.renderKeepingPosition();
-    } catch (e) { setStatus(`Feil: ${e.message}`); }
-    finally { this.loadingBack = false; }
+    })().finally(() => { this.backPromise = null; });
   }
 
   /* Hent sanntid for perioden rundt nå på nytt */
@@ -763,6 +862,13 @@ function pointOnRoute(scene, t) {  // t = 0 ved venstre kai, 1 ved høyre
   };
 }
 
+/* " via Vassdalsvik" når turen går innom andre kaier før motsatt side */
+function viaText(d) {
+  const i = d.stops.findIndex(x => x.target);
+  const via = d.stops.slice(0, i).map(x => x.name);
+  return via.length ? ` via ${via.join(", ")}` : "";
+}
+
 /* Hvor fergen(e) er nå, som andel av ruten (t) – uavhengig av hvilket bilde som vises */
 function ferryState(board, now) {
   const trips = [
@@ -776,9 +882,9 @@ function ferryState(board, now) {
     return {
       ferries: active.map(d => {
         const p = (now - d.expected) / (d.arrival - d.expected);
-        return { t: d.from === "l" ? p : 1 - p, moving: true, leftward: d.from === "r" };
+        return { t: d.from === "l" ? p : 1 - p, moving: true, leftward: d.from === "r", trip: d };
       }),
-      text: `Underveis til ${name(active[0].to)} · ankomst ca. ${hhmm(active[0].arrival)}`,
+      text: `Underveis til ${name(active[0].to)}${viaText(active[0])} · ankomst ca. ${hhmm(active[0].arrival)}`,
     };
   }
 
@@ -822,10 +928,26 @@ function syncChildren(g, n, make) {
   while (g.children.length < n) g.append(make());
 }
 
+/* Ruteikon over fergen når turen har flere stopp; samme hint og boks som ikonet i listen */
+function makeFerryIcon(board) {
+  const g = document.createElementNS(SVG_NS, "g");
+  g.classList.add("ferryicon");
+  g.innerHTML = `<title></title><rect x="-17" y="-11" width="34" height="22" rx="11"/>
+    <path d="M-9 0h18"/><circle cx="-8.5" r="2.6"/><circle class="mid" r="2.6"/><circle cx="8.5" r="2.6"/>`;
+  g.addEventListener("click", e => { e.stopPropagation(); board.showStops(g); });
+  return g;
+}
+
 function updateFerry(board) {
   const { ferries, text } = ferryState(board, Date.now());
   for (const svg of document.querySelectorAll(".map .scene")) {
     const scene = SCENES[svg.dataset.scene];
+    // skjermpiksler per bildeenhet, så ikonet får samme størrelse på skjermen i begge bilder
+    const box = svg.getBoundingClientRect();
+    const [, , vbW, vbH] = svg.getAttribute("viewBox").split(" ").map(Number);
+    const px = box.width ? Math.min(box.width / vbW, box.height / vbH) : 1;
+    const icons = svg.querySelector(".ferryicons");
+    syncChildren(icons, ferries.length, () => makeFerryIcon(board));
     const g = svg.querySelector(".ferries");
     syncChildren(g, ferries.length, makeFerry);
     const spots = svg.querySelector(".spots");
@@ -839,6 +961,18 @@ function updateFerry(board) {
       el.classList.toggle("leftward", f.leftward);
       // lyskjeglen ligger midt på fergen, litt over vannlinjen
       if (spots) spots.children[i].style.transform = `translate(${p.x}px, ${p.y - 25 * p.scale}px) scale(${p.scale})`;
+
+      // ruteikon over masten, bare på turer med flere stopp
+      const icon = icons.children[i], d = f.trip;
+      const multi = d?.stops.length > 1;
+      icon.style.display = multi ? "" : "none";
+      if (!multi) return;
+      const k = 1 / px;   // ikonet tegnes i skjermpiksler
+      icon.style.transform = `translate(${p.x}px, ${p.y - 76 * p.scale - 16 * k}px) scale(${k})`;
+      if (icon.dataset.key !== d.key) {
+        icon.dataset.key = d.key;
+        icon.querySelector("title").textContent = "Alle stopp: " + d.stops.map(x => `${hhmm(x.time)} ${x.name}`).join(", ");
+      }
     });
   }
   document.getElementById("ferryStatus").textContent = text;
@@ -1006,7 +1140,7 @@ async function resolveConfig() {
   history.replaceState(null, "", `?samband=${nsrNum(left.id)}-${nsrNum(right.id)}`);
 }
 
-/* Alle bilferger med nøyaktig to fergeleier, som par sortert etter navnet til venstre */
+/* Alle par av fergeleier som en bilferge går mellom (også med stopp underveis), sortert etter navnet til venstre */
 let pairsPromise = null;
 function loadPairs() {
   pairsPromise ??= gql(`{ lines(transportModes: [water]) { publicCode transportSubmode
@@ -1014,17 +1148,18 @@ function loadPairs() {
     const pairs = new Map();
     for (const line of d.lines) {
       if (!CAR_FERRY.has(line.transportSubmode)) continue;
-      const stops = new Map();
-      for (const jp of line.journeyPatterns) for (const q of jp.quays) {
-        const sp = q.stopPlace.parent ?? q.stopPlace;
-        stops.set(sp.id, { id: sp.id, name: shortName(sp.name) });
+      for (const jp of line.journeyPatterns) {
+        const stops = jp.quays.map(q => q.stopPlace.parent ?? q.stopPlace).map(sp => ({ id: sp.id, name: shortName(sp.name) }));
+        // alle par der fergen går fra det ene til det andre på samme tur
+        for (let a = 0; a < stops.length; a++) for (let b = a + 1; b < stops.length; b++) {
+          if (stops[a].id === stops[b].id) continue;
+          const [left, right] = orderPair(stops[a], stops[b]);
+          const key = `${left.id}|${right.id}`;
+          const pair = pairs.get(key) ?? { left, right, codes: new Set() };
+          if (line.publicCode) pair.codes.add(line.publicCode);
+          pairs.set(key, pair);
+        }
       }
-      if (stops.size !== 2) continue;
-      const [left, right] = orderPair(...stops.values());
-      const key = `${left.id}|${right.id}`;
-      const pair = pairs.get(key) ?? { left, right, codes: new Set() };
-      if (line.publicCode) pair.codes.add(line.publicCode);
-      pairs.set(key, pair);
     }
     return [...pairs.values()].sort((a, b) => byName(a.left, b.left) || byName(a.right, b.right));
   }).catch(e => { pairsPromise = null; throw e; });

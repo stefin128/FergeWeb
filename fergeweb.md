@@ -49,8 +49,10 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Knappen **«↺ Til neste avgang»** dukker opp når man har scrollet bort fra nå-tidspunktet.
 
 ### Scrolling
-- Drar man **oppover**, hentes flere avganger fremover (24 timer om gangen).
+- Drar man **oppover**, hentes flere avganger fremover (24 timer om gangen, inntil 60 dager frem). Nederst står «Ingen flere avganger» når grensen er nådd.
 - Drar man **nedover**, hentes tidligere avganger (12 timer om gangen, inntil 7 dager tilbake).
+- Listen fylles automatisk til den kan scrolles begge veier. Ruter med få avganger, for eksempel Ørnes–Bolga (bare noen dager i uka), ville ellers vist så få rader at listen ikke kunne scrolles, og da ble det aldri hentet mer. Perioder uten avganger gir dobbelt så lange hentinger neste gang, opp til en uke om gangen.
+- Bare båtavganger hentes fra Entur (`whiteListedModes: [water]`), så busser fra samme kai (f.eks. Ørnes) ikke tar plassen i svaret.
 - På PC kan man dra i listen med musen, i tillegg til vanlig scrolling. På mobil fungerer touch.
 
 ### Rutetider og sanntid
@@ -71,7 +73,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 Opprinnelig var tanken å velge et avgangssted og deretter et anløpssted. Det er erstattet av en liste med ferdige par av fergeleier, hentet fra Entur.
 
 ### Valg av samband
-- Knappen ⚙ ved tittelen åpner **Velg samband**: en liste med alle bilferger som går mellom nøyaktig to fergeleier (89 par per oktober 2026), med søkefelt.
+- Knappen ⚙ ved tittelen åpner **Velg samband**: en liste med søkefelt over alle par av fergeleier som en bilferge går mellom, også der fergen går innom andre kaier underveis (591 par per oktober 2026). For eksempel gir linje 18-435 parene Ørnes–Vassdalsvik, Ørnes–Meløysund, Ørnes–Bolga og Meløysund–Vassdalsvik. Hurtigruten og Havila er ikke med, fordi det er kystruter og ikke fergesamband.
 - Hvert par vises som i appen: stedsnavn uten «ferjekai», «kai» osv., og linjekoden (for eksempel «Misten – Festvåg · 18-538»). Går flere linjer mellom de samme kaiene, vises alle kodene.
 - Stedet som kommer **senest i alfabetet** (norsk sortering, æ ø å til slutt) står til **venstre**, både i listen og i appen. Listen sorteres A–Å etter dette navnet. Misten–Festvåg står derfor som før.
 - Valgt samband er uthevet i listen. Velger man et annet, lastes siden på nytt med det nye sambandet.
@@ -82,13 +84,21 @@ Opprinnelig var tanken å velge et avgangssted og deretter et anløpssted. Det e
 ### Per samband
 - **Foto** finnes bare for Misten–Festvåg. Andre samband bruker alltid det enkle bildet, og valget Enkel/Foto skjules.
 - **Webkamera** finnes bare for fergeleier med kjent adresse (`WEBCAMS` i scriptet, i dag Misten og Festvåg). Andre skilt er ikke lenker.
-- Avganger tas med når turen går med båt (`water`) og videre til kaien på motsatt side. Det filtreres ikke lenger på en bestemt linjekode.
+- Avganger tas med når turen går med **bilferge** og videre til kaien på motsatt side. Hurtigbåter og passasjerbåter som går mellom de samme kaiene, tas ikke med. Det filtreres ikke på en bestemt linjekode.
+
+### Avganger med flere stopp
+- Går fergen innom flere kaier på turen, vises **første stopp** etter avgangstiden, for eksempel «15:45 → Vassdalsvik», og et lite ruteikon.
+- Holder man musen over ikonet, vises alle stopp med rutetid. Trykker man på ikonet (også på mobil), vises de i en liten boks, for eksempel «Fra Meløysund 15:45: 16:00 Vassdalsvik, 16:15 Meløysund, **16:50 Ørnes**». Kaien på motsatt side er uthevet. Boksen lukkes ved klikk utenfor, Esc eller scrolling.
+- Går fergen direkte, vises verken første stopp eller ikon, slik som på Misten–Festvåg.
+- På rundturer kan samme tur gå fra samme kai to ganger (f.eks. Meløysund 15:45 og 16:15). Begge vises som egne avganger.
+- **I bildet:** Når fergen er på en tur med flere stopp, står samme ruteikon over fergen og følger den over fjorden. Ikonet har samme hint ved musepeker og samme boks med alle stopp ved klikk/trykk som i listen. Ikonet har samme størrelse på skjermen i begge bilder (ca. 34 × 22 px).
+- Statuslinjen i bildet nevner kaier fergen går innom før motsatt side, for eksempel «Underveis til Meløysund via Vassdalsvik · ankomst ca. 08:25».
 
 ### I koden
 - `DEFAULT_PAIR`: standard-sambandet, som også er det fotoet viser.
 - `WEBCAMS`: webkamera-adresse per fergeleie (NSR-id).
-- `CAR_FERRY`: hvilke typer båt (Entur `transportSubmode`) som tas med i listen.
-- Andre justerbare konstanter: `DELAY_THRESHOLD` (5 min), `REFRESH_MS` (60 s), `INITIAL_BACK` (12 t), `PAGE_FORWARD`, `PAGE_BACK` og `MAX_BACK`.
+- `CAR_FERRY`: hvilke typer båt (Entur `transportSubmode`) som regnes som bilferge, både i listen over samband og for avgangene.
+- Andre justerbare konstanter: `DELAY_THRESHOLD` (5 min), `REFRESH_MS` (60 s), `INITIAL_BACK` (12 t), `PAGE_FORWARD`, `PAGE_BACK`, `MAX_BACK` (7 døgn), `MAX_FORWARD` (60 døgn) og `MAX_PAGE` (7 døgn).
 
 ## Teknologi
 Det er ønskelig at det i første omgang ikke trengs noen servertjeneste utover api for fergeruter, med andre ord webappen skal være "selfcontained".
@@ -115,7 +125,9 @@ Appen bruker Entur Journey Planner v3 (GraphQL), `https://api.entur.io/journey-p
 I prioritert rekkefølge:
 - [x] Visning av fergen i antatt sanntid basert på faktisk avgang, og estimert overfartstid, altså "fergen" skal vises på et sted mellom høyre og venstre side (fergeleier) avhengig av hvor den er beregnet. 
 - [x] Konfigurasjon: valg av samband fra en liste med par av fergeleier fra Entur (se Konfigurasjon).
-- [] Fergeleier med flere ruter: samband der fergen går mellom flere enn to fergeleier, f.eks. Bodø – Værøy – Røst – Moskenes (per oktober 2026 54 bilferjelinjer med tre eller flere kaier, som ikke kommer med i listen). Må avklare hvordan slike par vises og hvordan fergens posisjon beregnes når den stopper underveis.
+- [x] Fergeleier med flere ruter: par fra bilferger med flere kaier er med i listen, og avganger med flere stopp viser første stopp og alle stopp ved trykk på ikonet (se Konfigurasjon).
+- [] Fergens posisjon på turer med stopp underveis: i dag tegnes fergen rett over fra kai til kai, også når den går innom en annen kai først. På Ørnes–Meløysund går 13:35 direkte (35 min), mens 07:35 går via Vassdalsvik (50 min), men begge tegnes som én rett overfart.
+- [] Mellomlagring (cache) av avganger, så appen fortsatt viser rutetider ved nettbrudd eller når dekningen faller ut på mobil. Kan også redusere antall kall mot Entur på ruter med få avganger (f.eks. Ørnes–Bolga, ca. 30 kall ved første lasting).
 - [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
 - [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
 - [x] Fra alfa-tester: skilt ved hvert fergeleie i enkelt bilde i stedet for tekst nederst.
