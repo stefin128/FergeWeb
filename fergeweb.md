@@ -76,6 +76,7 @@ Opprinnelig var tanken å velge et avgangssted og deretter et anløpssted. Det e
 - Knappen ⚙ ved tittelen åpner **Velg samband**: en liste med søkefelt over alle par av fergeleier som en bilferge går mellom, også der fergen går innom andre kaier underveis (591 par per oktober 2026). For eksempel gir linje 18-435 parene Ørnes–Vassdalsvik, Ørnes–Meløysund, Ørnes–Bolga og Meløysund–Vassdalsvik. Hurtigruten og Havila er ikke med, fordi det er kystruter og ikke fergesamband.
 - Hvert par vises som i appen: stedsnavn uten «ferjekai», «kai» osv., og linjekoden (for eksempel «Misten – Festvåg · 18-538»). Går flere linjer mellom de samme kaiene, vises alle kodene.
 - Stedet som kommer **senest i alfabetet** (norsk sortering, æ ø å til slutt) står til **venstre**, både i listen og i appen. Listen sorteres A–Å etter dette navnet. Misten–Festvåg står derfor som før.
+- Begynner man å skrive mens fokus er et annet sted i dialogen (f.eks. på et samband i listen), flyttes fokus til søkefeltet og teksten legges til søket. Backspace sletter siste tegn i søket på samme måte.
 - Valgt samband er uthevet i listen. Velger man et annet, lastes siden på nytt med det nye sambandet.
 - Valget **huskes i nettleseren**, og adressen får `?samband=<venstre>-<høyre>` (nummeret i NSR:StopPlace-id-en, f.eks. `?samband=58672-62316`), så et samband kan deles eller bokmerkes. En lenke går foran det som er husket.
 - Ukjente fergeleier i lenken gir standard-sambandet (Misten–Festvåg) med en melding i statusfeltet.

@@ -1209,6 +1209,17 @@ function initPairDialog() {
     }
   });
   search.addEventListener("input", render);
+  // begynner man å skrive et annet sted i dialogen, fortsetter det i søkefeltet
+  dlg.addEventListener("keydown", e => {
+    if (e.target === search || e.ctrlKey || e.metaKey || e.altKey) return;
+    const typed = e.key.length === 1 && e.key !== " ";
+    if (!typed && e.key !== "Backspace") return;
+    e.preventDefault();
+    search.focus();
+    search.value = typed ? search.value + e.key : search.value.slice(0, -1);
+    search.setSelectionRange(search.value.length, search.value.length);
+    render();
+  });
   document.getElementById("pairClose").addEventListener("click", () => dlg.close());
   // klikk utenfor dialogen lukker den
   dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
