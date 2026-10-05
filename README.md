@@ -22,6 +22,8 @@ Rutedata hentes direkte fra [Entur](https://developer.entur.org/) sitt åpne API
 |---|---|
 | `index.html` | Hele appen |
 | `fergeweb.md` | Spesifikasjon og beskrivelse av funksjonaliteten |
+| `sw.js` | Service worker: lagrer appen, så den kan åpnes uten nett |
+| `manifest.webmanifest`, `icon-*.png` | App-beskrivelse og ikoner for installering på hjemskjerm/PC |
 | `bare_fjorden_navn.png` | Originalt bakgrunnsbilde (kilde) |
 | `bare_fjorden_navn.webp` | Komprimert bakgrunnsbilde, som er innebygd i `index.html` |
 

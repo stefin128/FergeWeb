@@ -61,6 +61,23 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Bare båtavganger hentes fra Entur (`whiteListedModes: [water]`), så busser fra samme kai (f.eks. Ørnes) ikke tar plassen i svaret.
 - På PC kan man dra i listen med musen, i tillegg til vanlig scrolling. På mobil fungerer touch.
 
+### Uten nett
+- Hver gang avganger hentes for et samband, lagres de i nettleseren (localStorage): fra 6 timer bakover til **2 døgn frem**. Det som var lagret for samme samband fra før, kastes. Bare de 5 sist brukte sambandene beholdes. Misten–Festvåg tar ca. 27 kB.
+- Ved oppstart vises lagrede avganger med en gang, så appen starter raskt. Deretter hentes ferske data, som erstatter de lagrede.
+- Uten nett vises de lagrede avgangene, med et oransje merke i toppen, også på mobil: «Uten nett – lagret 12:00» (dag tas med hvis det ikke er i dag). Appen prøver igjen hvert minutt og venter 30 sekunder etter et mislykket forsøk før den henter mer ved scrolling. Merket forsvinner når nettet er tilbake.
+- Navnene på kaiene og posisjonen til fergeleiet til venstre (for fargetonen) lagres også, så lagrede samband kan åpnes og vises riktig uten nett.
+- Åpnes et samband som ikke er lagret mens man er uten nett, vises sist brukte samband i stedet.
+- Sanntid (forsinkelser og innstillinger) er ikke oppdatert uten nett. Listen viser det som var kjent da avgangene ble lagret.
+- **Selve appen uten nett:** En service worker (`sw.js`) lagrer selve siden, ikonet og app-beskrivelsen ved første besøk. Deretter kan appen åpnes uten nett, også via en lenke til et annet samband (`?samband=…`). Den henter alltid fra nettet først når det er dekning, så man får nyeste versjon, og bruker den lagrede kopien bare når nettet mangler. Kall til Entur går utenom service workeren, fordi avgangene lagres av appen selv.
+- Service worker virker bare når siden kommer fra en webserver (f.eks. GitHub Pages), ikke når `index.html` åpnes direkte som fil. Da hoppes det stille over, og resten av appen virker som før.
+
+### App på hjemskjermen
+- `manifest.webmanifest` og ikonene `icon-192.png` og `icon-512.png` gjør at appen kan **installeres**. Den åpnes da i eget vindu uten nettleserens adresselinje, med fergeikonet.
+- **Android (Chrome):** meny ⋮ → «Installer app» eller «Legg til på startskjermen».
+- **iPhone/iPad (Safari):** Del-knappen → «Legg til på Hjem-skjerm».
+- **PC/Mac:** Chrome og Edge viser et installeringsikon i adresselinjen, og appen legges da i startmenyen eller dokken. Safari på Mac: Arkiv → «Legg til i Dock». Firefox på PC støtter ikke installering.
+- Appen starter på sist brukte samband, siden valget huskes.
+
 ### Rutetider og sanntid
 - Passerte avganger vises alltid med **rutetid**.
 - Kommende avganger vises med rutetid, med mindre sanntid avviker med **minst 5 minutter**. Da vises rutetiden gjennomstreket, ny forventet tid og merket «Ny tid».
@@ -111,6 +128,7 @@ Opprinnelig var tanken å velge et avgangssted og deretter et anløpssted. Det e
 Det er ønskelig at det i første omgang ikke trengs noen servertjeneste utover api for fergeruter, med andre ord webappen skal være "selfcontained".
 
 - Hele appen er én fil, `index.html` (ren HTML, CSS og JavaScript), uten byggesteg og avhengigheter. Den kan kopieres alene til for eksempel en mobiltelefon.
+- I tillegg ligger det noen små filer for bruk uten nett og som installert app: `sw.js`, `manifest.webmanifest`, `icon-192.png` og `icon-512.png`. De brukes bare når appen kommer fra en webserver, og `index.html` virker fortsatt alene.
 - Bakgrunnsbildet er innebygd som base64 i et lite script helt nederst i `index.html`. Det er en komprimert utgave (WebP, kvalitet 85, ca. 300 kB) av originalen `bare_fjorden_navn.png` (2,4 MB). Originalen og `bare_fjorden_navn.webp` beholdes som kilder, men trengs ikke for å kjøre appen.
 - Byttes bildet, lages ny WebP og base64-strengen på siste script-linje erstattes.
 - Fergeleienes plassering i bildet er angitt i `DOCK` i scriptet (bildekoordinater, 1774 × 887). Byttes bildet, må disse justeres.
@@ -141,7 +159,8 @@ I prioritert rekkefølge:
 - [x] Konfigurasjon: valg av samband fra en liste med par av fergeleier fra Entur (se Konfigurasjon).
 - [x] Fergeleier med flere ruter: par fra bilferger med flere kaier er med i listen, og avganger med flere stopp viser første stopp og alle stopp ved trykk på ikonet (se Konfigurasjon).
 - [] Fergens posisjon på turer med stopp underveis: i dag tegnes fergen rett over fra kai til kai, også når den går innom en annen kai først. På Ørnes–Meløysund går 13:35 direkte (35 min), mens 07:35 går via Vassdalsvik (50 min), men begge tegnes som én rett overfart.
-- [] Mellomlagring (cache) av avganger, så appen fortsatt viser rutetider ved nettbrudd eller når dekningen faller ut på mobil. Kan også redusere antall kall mot Entur på ruter med få avganger (f.eks. Ørnes–Bolga, ca. 30 kall ved første lasting).
+- [x] Mellomlagring av avganger per samband (2 døgn frem), så appen viser rutetider ved nettbrudd (se Uten nett).
+- [x] Åpne appen helt uten nett, og installere den som app på hjemskjermen eller PC-en (se Uten nett og App på hjemskjermen).
 - [] Webkamera for alle fergeleier: finne et API som gir webkamera ved valgt fergeleie, så skiltet kan bli lenke (med kameraikon) for alle samband og ikke bare Misten–Festvåg. Kjent så langt: Statens vegvesens åpne API (DATEX II) krever brukernavn og passord, som ikke kan ligge i en offentlig fil. API-et vegvesen.no selv bruker, er internt og ikke ment for andre (se Webkamera).
 - [x] Publisering: https://stefin128.github.io/FergeWeb/ (GitHub Pages fra `main`).
 - [x] Fra alfa-tester: valg mellom enkelt bilde og foto, og i fotoet fremheves fergen og kaiene/skiltene mens resten dempes.
