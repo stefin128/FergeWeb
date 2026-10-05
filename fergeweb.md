@@ -117,6 +117,13 @@ Det er ønskelig at det i første omgang ikke trengs noen servertjeneste utover 
 - Den kan åpnes direkte i nettleseren eller serveres statisk (for eksempel `python3 -m http.server`).
 - Publisering avventes foreløpig.
 
+## Versjon
+- Versjonsnummeret er antall commits på `main`. Det står med dato i konstanten `VERSION` i `index.html`.
+- `VERSION` oppdateres automatisk ved hver commit av git-hooken `.githooks/pre-commit`. Bare versjonslinjen endres, også når andre endringer i `index.html` ikke er staget.
+- Hooken må aktiveres én gang per klone: `git config core.hooksPath .githooks`. GitKraken bruker samme hooks.
+- Ved `git commit --amend` regnes versjonen ut på nytt og blir ett nummer for høy. Det gir et hopp i nummereringen, men ingen feil.
+- **Visning:** Fergen i bildet heter «MF FERGEWEB <versjon>», malt på skroget. Holder man musen over fergen, vises versjon og dato, og klikk eller trykk på fergen viser det samme i en liten boks.
+
 ## Kilder for fergeruter
 Det ligger en løsning i katalogen /home/stefi/src/FergeUtils der det allerede er brukt api for å hente dette.
 

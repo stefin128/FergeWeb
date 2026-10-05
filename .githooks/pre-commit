@@ -1,0 +1,29 @@
+#!/bin/sh
+# Setter versjonsnummer og dato i index.html ved hver commit.
+# Versjonen er antall commits på grenen, medregnet den som lages nå.
+#
+# Aktiveres én gang per klone:  git config core.hooksPath .githooks
+#
+# Bare versjonslinjen endres, både i det som committes (index) og i arbeidsfilen,
+# så andre ikke-stagede endringer i index.html ikke blir med i committen.
+
+FILE=index.html
+PATTERN='^const VERSION = \{ number: [0-9]+, date: "[0-9-]+" \};'
+
+# hopp over hvis index.html ikke er med i repoet eller mangler versjonslinjen
+git cat-file -e ":$FILE" 2>/dev/null || exit 0
+git show ":$FILE" | grep -qE "$PATTERN" || exit 0
+
+number=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + 1 ))
+date=$(date +%Y-%m-%d)
+line="const VERSION = { number: $number, date: \"$date\" };"
+
+# versjonen som committes
+blob=$(git show ":$FILE" | sed -E "s/$PATTERN/$line/" | git hash-object -w --stdin) || exit 1
+mode=$(git ls-files -s "$FILE" | cut -d' ' -f1)
+git update-index --cacheinfo "$mode,$blob,$FILE" || exit 1
+
+# samme linje i arbeidsfilen, så den ikke ser endret ut etterpå
+[ -f "$FILE" ] && sed -i -E "s/$PATTERN/$line/" "$FILE"
+
+exit 0

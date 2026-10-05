@@ -25,6 +25,16 @@ Rutedata hentes direkte fra [Entur](https://developer.entur.org/) sitt åpne API
 | `bare_fjorden_navn.png` | Originalt bakgrunnsbilde (kilde) |
 | `bare_fjorden_navn.webp` | Komprimert bakgrunnsbilde, som er innebygd i `index.html` |
 
+## Versjon
+
+Versjonen er antall commits og settes automatisk i `index.html` ved hver commit. Aktiver hooken én gang etter kloning:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Versjonen vises som navnet på fergen i bildet: «MF FERGEWEB 12». Hold musen over eller trykk på fergen for å se dato.
+
 ## Data
 
 Rutedata: [Entur](https://entur.no), lisensiert under [NLOD](https://data.norge.no/nlod/no/2.0).

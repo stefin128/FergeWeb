@@ -187,6 +187,7 @@
   }
   .stopspop[hidden] { display: none; }
   .ferryicon { cursor: pointer; transition: transform 1s linear; }
+  .vessel { cursor: pointer; }
   .map .tint { pointer-events: none; transition: opacity 2s, fill 2s; }
   /* Navigasjonslys: bare når sola er nede. Sidelys bare under fart, i fartsretningen. */
   .ferry .lights { display: none; }
@@ -346,7 +347,10 @@
           <path d="M-88 -6 L88 -6 L80 4 L-80 4Z" fill="#23303d"/>
           <path d="M-94 -26 L94 -26 L88 -6 L-88 -6Z" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
           <path d="M-91 -15 L91 -15 L90 -11 L-90 -11Z" fill="#c92a2a"/>
-          <rect x="-74" y="-24" width="148" height="6" fill="#4a5664"/>
+          <rect x="-74" y="-25" width="148" height="8" fill="#4a5664"/>
+          <!-- skipsnavn med versjonsnummer, settes ved oppstart -->
+          <text id="ferryName" y="-18.6" text-anchor="middle" fill="#fff" font-size="7" font-weight="700"
+                font-family="system-ui, sans-serif" letter-spacing=".6">MF FERGEWEB</text>
           <rect x="-52" y="-44" width="104" height="18" rx="2" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
           <rect x="-46" y="-39" width="92" height="5" fill="#26394d"/>
           <rect x="-20" y="-58" width="40" height="14" rx="2" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
@@ -407,6 +411,9 @@ const PAIR_KEY = "fergeweb.samband";
 
 // Fylles ut av resolveConfig() ved oppstart: { left, right, photo }, der left/right er { id, name, webcam }
 const CONFIG = { left: null, right: null, photo: false };
+
+// Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
+const VERSION = { number: 12, date: "2026-10-05" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -715,14 +722,28 @@ class Board {
     this.pop.innerHTML =
       `<div class="sp-head">Fra ${esc(d.from)} ${hhmm(d.aimed)}</div>` +
       d.stops.map(x => `<div class="sp-stop${x.target ? " target" : ""}"><span>${hhmm(x.time)}</span>${esc(x.name)}</div>`).join("");
+    this.placePop(btn);
+  }
+
+  /* Vis boksen under (eller over) elementet den hører til */
+  placePop(anchor) {
     this.pop.hidden = false;
-    const r = btn.getBoundingClientRect(), w = this.pop.offsetWidth, h = this.pop.offsetHeight;
+    const r = anchor.getBoundingClientRect(), w = this.pop.offsetWidth, h = this.pop.offsetHeight;
     const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
     const below = r.bottom + 6 + h < innerHeight;
     Object.assign(this.pop.style, { left: `${left}px`, top: `${below ? r.bottom + 6 : r.top - h - 6}px` });
   }
 
   hideStops() { if (this.pop && !this.pop.hidden) this.pop.hidden = true; }
+
+  /* Samme boks som stoppene, med fergens navn og appens versjon */
+  showVersion(anchor) {
+    if (!this.pop.hidden && this.pop.dataset.key === "version") { this.hideStops(); return; }
+    this.pop.dataset.key = "version";
+    this.pop.innerHTML = `<div class="sp-head">Fergen heter</div><div class="sp-stop target">MF FERGEWEB ${VERSION.number}</div>` +
+      `<div class="sp-head" style="margin-top:6px">FergeWeb versjon ${VERSION.number} · ${versionDate()}</div>`;
+    this.placePop(anchor);
+  }
 
   /* Høyden på det som klistrer seg øverst (kolonneoverskrift + dagoverskrift) */
   stickyHeight() {
@@ -913,9 +934,14 @@ function ferryState(board, now) {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-function makeFerry() {
+function makeFerry(board) {
   const g = document.createElementNS(SVG_NS, "g");
-  g.classList.add("ferry");
+  g.classList.add("ferry", "vessel");
+  // fergen heter "MF FERGEWEB <versjon>": hint ved musepeker, boks ved klikk/trykk
+  const title = document.createElementNS(SVG_NS, "title");
+  title.textContent = versionText();
+  g.append(title);
+  g.addEventListener("click", e => { e.stopPropagation(); board.showVersion(g); });
   for (const [cls, ref] of [["wake", "#wakeShape"], ["bob", "#ferryShape"]]) {
     const inner = document.createElementNS(SVG_NS, "g");
     inner.classList.add(cls);
@@ -969,7 +995,7 @@ function updateFerry(board) {
     const icons = svg.querySelector(".ferryicons");
     syncChildren(icons, ferries.length, () => makeFerryIcon(board));
     const g = svg.querySelector(".ferries");
-    syncChildren(g, ferries.length, makeFerry);
+    syncChildren(g, ferries.length, () => makeFerry(board));
     const spots = svg.querySelector(".spots");
     if (spots) syncChildren(spots, ferries.length, makeSpot);
 
@@ -1298,6 +1324,10 @@ function initPairDialog() {
   dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
 }
 
+/* ---------- Versjon ---------- */
+const versionDate = () => new Date(VERSION.date + "T12:00:00Z").toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+const versionText = () => `MF FERGEWEB ${VERSION.number} – FergeWeb versjon ${VERSION.number}, ${versionDate()}`;
+
 /* ---------- Oppstart ---------- */
 const statusEl = document.getElementById("status");
 function setStatus(t) { statusEl.textContent = t; }
@@ -1326,6 +1356,7 @@ async function main() {
   const { left, right } = CONFIG;
   setTitle();
   initPairDialog();
+  document.getElementById("ferryName").textContent = `MF FERGEWEB ${VERSION.number}`;
 
   new ResizeObserver(refreshSigns).observe(document.getElementById("map"));
   window.addEventListener("resize", refreshSigns);
