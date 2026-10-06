@@ -39,11 +39,20 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Webkameraene kan ikke finnes automatisk. Vegvesenets åpne API for webkamera (DATEX II) krever brukernavn og passord, og det kan ikke ligge i en offentlig fil. API-et som vegvesen.no selv bruker, er internt og ikke ment for andre. Adressene legges derfor inn manuelt, og ved konfigurasjon senere må de inngå i oppsettet for hvert fergeleie.
 
 ### Fergens posisjon
+- **Ekte posisjon:** Appen henter hvert 20. sekund posisjonen til fergene på sambandets linjer fra Entur (sanntid for fartøy, `api.entur.io/realtime/v2/vehicles`). Fergen tegnes der den faktisk er, langs ruten mellom fergeleiene. Posisjonen projiseres på linjen mellom de to kaiene, og fergeleienes posisjon hentes fra Entur.
+- Mellom meldingene flyttes fergen jevnt videre med den farten den faktisk har hatt, høyst 90 sekunder frem. Står den stille, for eksempel ved kai før avgang, blir den stående.
+- Går flere ferger på sambandet, vises alle, for eksempel Bastø IV og Bastø V på Moss–Horten.
+- **Anslag som reserve:** Mangler sanntid eller er den eldre enn 5 minutter, beregnes posisjonen som før: jevnt fra forventet avgang til forventet ankomst. Mellom turene ligger fergen ved kaien den sist kom til. Noen ferger melder bare posisjon når de er på tur (f.eks. Misten–Festvåg), så ved kai brukes anslaget.
 - Fergen tegnes i bildet der den antas å være akkurat nå, og flyttes hvert sekund. Når den ligger ved kai, ligger den inntil fergeleiet. Under overfart går den i en bue litt nærmere betrakteren, tegnes litt større midt i fjorden, vugger svakt og har kjølvann bak seg.
-- Under en overfart flyttes den jevnt langs ruten mellom fergeleiene, fra forventet avgang til forventet ankomst. Entur gir ingen posisjonsdata, så dette er et anslag. Mangler forventet ankomst, brukes rutetid for ankomst forskjøvet med samme forsinkelse som ved avgang.
-- Når ingen overfart pågår, ligger fergen ved kaien den sist ankom.
 - Nederst i bildet står en statuslinje, for eksempel «Underveis til Festvåg · ankomst ca. 19:10» eller «Ved Misten · neste avgang 19:15».
-- Innstilte avganger regnes ikke med. Går flere overfarter samtidig (flere ferjer), tegnes én ferge per overfart.
+- Innstilte avganger regnes ikke med.
+
+### Fergens navn
+- Entur oppgir hvilken ferge som går hver tur (MMSI-nummer, skipets faste AIS-id), men ikke navnet. Navnet hentes fra en liste i appen (`VESSELS`), med 89 ferger på bilferjelinjene per oktober 2026. Navnene er hentet fra Kystverkets åpne AIS-data og rettet til norsk skrivemåte (AIS kan ikke skrive æ, ø og å).
+- Navnet står på skroget, for eksempel «MF BJARKØY» på Misten–Festvåg. Ukjente ferger heter «MF FERGEWEB <versjon>».
+- Når fergen ligger ved kai mellom turene, brukes navnet hvis bare én ferge er sett på sambandet de siste 3 timene.
+- Hold musen over eller trykk på fergen: navn, om posisjonen er fra sanntid (med klokkeslett) eller beregnet, og appens versjon.
+- Nye ferger legges til i `VESSELS` i `index.html`, og det krever ny publisering. Noen operatører bruker egne id-er i stedet for MMSI (f.eks. `MOR:Vehicle:…`), og de får ikke navn.
 
 ### Tid og dager
 - Ved oppstart scrolles listen til neste avgang, med én passert avgang synlig over.
@@ -140,7 +149,7 @@ Det er ønskelig at det i første omgang ikke trengs noen servertjeneste utover 
 - `VERSION` oppdateres automatisk ved hver commit av git-hooken `.githooks/pre-commit`. Bare versjonslinjen endres, også når andre endringer i `index.html` ikke er staget.
 - Hooken må aktiveres én gang per klone: `git config core.hooksPath .githooks`. GitKraken bruker samme hooks.
 - Ved `git commit --amend` regnes versjonen ut på nytt og blir ett nummer for høy. Det gir et hopp i nummereringen, men ingen feil.
-- **Visning:** Fergen i bildet heter «MF FERGEWEB <versjon>», malt på skroget. Holder man musen over fergen, vises versjon og dato, og klikk eller trykk på fergen viser det samme i en liten boks.
+- **Visning:** Versjonen vises i boksen når man trykker på fergen. Ferger uten kjent navn heter «MF FERGEWEB <versjon>» på skroget.
 
 ## Kilder for fergeruter
 Det ligger en løsning i katalogen /home/stefi/src/FergeUtils der det allerede er brukt api for å hente dette.
@@ -158,7 +167,7 @@ I prioritert rekkefølge:
 - [x] Visning av fergen i antatt sanntid basert på faktisk avgang, og estimert overfartstid, altså "fergen" skal vises på et sted mellom høyre og venstre side (fergeleier) avhengig av hvor den er beregnet. 
 - [x] Konfigurasjon: valg av samband fra en liste med par av fergeleier fra Entur (se Konfigurasjon).
 - [x] Fergeleier med flere ruter: par fra bilferger med flere kaier er med i listen, og avganger med flere stopp viser første stopp og alle stopp ved trykk på ikonet (se Konfigurasjon).
-- [] Fergens posisjon på turer med stopp underveis: i dag tegnes fergen rett over fra kai til kai, også når den går innom en annen kai først. På Ørnes–Meløysund går 13:35 direkte (35 min), mens 07:35 går via Vassdalsvik (50 min), men begge tegnes som én rett overfart.
+- [x] Fergens posisjon på turer med stopp underveis: løst med ekte posisjon fra sanntid (se Fergens posisjon). Anslaget brukes fortsatt når sanntid mangler.
 - [x] Mellomlagring av avganger per samband (2 døgn frem), så appen viser rutetider ved nettbrudd (se Uten nett).
 - [x] Åpne appen helt uten nett, og installere den som app på hjemskjermen eller PC-en (se Uten nett og App på hjemskjermen).
 - [] Webkamera for alle fergeleier: finne et API som gir webkamera ved valgt fergeleie, så skiltet kan bli lenke (med kameraikon) for alle samband og ikke bare Misten–Festvåg. Kjent så langt: Statens vegvesens åpne API (DATEX II) krever brukernavn og passord, som ikke kan ligge i en offentlig fil. API-et vegvesen.no selv bruker, er internt og ikke ment for andre (se Webkamera).

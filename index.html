@@ -360,9 +360,6 @@
           <path d="M-94 -26 L94 -26 L88 -6 L-88 -6Z" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
           <path d="M-91 -15 L91 -15 L90 -11 L-90 -11Z" fill="#c92a2a"/>
           <rect x="-74" y="-25" width="148" height="8" fill="#4a5664"/>
-          <!-- skipsnavn med versjonsnummer, settes ved oppstart -->
-          <text id="ferryName" y="-18.6" text-anchor="middle" fill="#fff" font-size="7" font-weight="700"
-                font-family="system-ui, sans-serif" letter-spacing=".6">MF FERGEWEB</text>
           <rect x="-52" y="-44" width="104" height="18" rx="2" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
           <rect x="-46" y="-39" width="92" height="5" fill="#26394d"/>
           <rect x="-20" y="-58" width="40" height="14" rx="2" fill="#f5f6f8" stroke="#1b2430" stroke-width="1"/>
@@ -424,8 +421,36 @@ const PAIR_KEY = "fergeweb.samband";
 // Fylles ut av resolveConfig() ved oppstart: { left, right, photo }, der left/right er { id, name, webcam }
 const CONFIG = { left: null, right: null, photo: false };
 
+// Kjente fartøy: MMSI-nummer (fra Entur) -> skipsnavn. Navnene er hentet fra Kystverkets åpne AIS-data.
+// Ukjente fartøy vises som "MF FERGEWEB <versjon>". Nye navn legges til her (krever ny publisering).
+const VESSELS = {
+  "257204400": "Alsten", "257044620": "Austrått", "257741000": "Barøy", "257122880": "Bastø Electric",
+  "259401000": "Bastø I", "259402000": "Bastø II", "257845600": "Bastø IV", "257846800": "Bastø V",
+  "258271000": "Bergensfjord", "257898600": "Bergsfjord", "259044800": "Bjarkøy", "257219400": "Bjørnsund",
+  "257144700": "Boknafjord", "257088660": "Bømlafjord", "258027900": "Dragsvik", "257017930": "Eidsfjord",
+  "257088670": "Fedjebjørn", "257055990": "Flatøy", "257077580": "Florøy", "257090750": "Fodnes",
+  "257306400": "Frøyaferga", "259681000": "Fykan", "257055910": "Færøy", "257253400": "Geisnes",
+  "257017920": "Gloppefjord", "259638000": "Glutra", "257362500": "Hamarøy", "257196000": "Harøy",
+  "257099310": "Heilhorn", "258000810": "Hidle", "258030970": "Hinnøy", "257061910": "Hjellestad",
+  "257282400": "Hjelmeland", "259097000": "Hjørundfjord", "257036840": "Horgefjord", "257055930": "Huftarøy",
+  "257042930": "Husavik", "258695000": "Husøy", "258001700": "Hydra", "259417000": "Julsund",
+  "257049700": "Kjella", "257382000": "Kommandøren", "257057960": "Lagatun", "259987000": "Landegode",
+  "258028100": "Leikanger", "257518000": "Lifjord", "257949600": "Losna", "259125000": "Lote",
+  "257127000": "Lurøy", "257056190": "Lysøy", "258149000": "Malangen", "257090540": "Mannheller",
+  "259216000": "Mastrafjord", "257022700": "Meløytind", "257017290": "Mokstrafjord", "257057980": "Munken",
+  "258002060": "Nesvik", "258343000": "Nordfjord", "259589000": "Olav Duun", "258000840": "Ombo",
+  "258221500": "Oppedal", "257066700": "Os", "258021190": "Ryfylke", "257058230": "Samlafjord",
+  "257055860": "Samnøy", "257125930": "Sandøy", "257387700": "Selje", "257243500": "Sigrid",
+  "257078370": "Sildafjord", "259593000": "Sjernarøy", "257377400": "Solskjel", "259419000": "Stavanger",
+  "258007770": "Stokkafjord", "259098000": "Storfjord", "257212400": "Sulafjord", "258010350": "Svelvik",
+  "257279000": "Torghatten", "259029500": "Torine", "257396400": "Trondenes", "257363500": "Tysfjord",
+  "257380400": "Vandve", "259049300": "Vargsund", "257163000": "Vetlefjord", "257029700": "Vikingen",
+  "259679000": "Vågan", "259988000": "Værøy", "258323000": "Ytterøyningen", "258573000": "Årdal",
+  "257292000": "Ørnes",
+};
+
 // Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
-const VERSION = { number: 14, date: "2026-10-06" };
+const VERSION = { number: 15, date: "2026-10-06" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -461,7 +486,7 @@ query($id: String!, $start: DateTime!, $range: Int!) {
       cancellation
       serviceJourney {
         id
-        journeyPattern { line { publicCode transportMode transportSubmode } }
+        journeyPattern { line { id publicCode transportMode transportSubmode } }
       }
       serviceJourneyEstimatedCalls {
         next {
@@ -517,6 +542,8 @@ function toDeparture(c, from, to) {
     realtime: c.realtime,
     cancelled: c.cancellation,
     code: line.publicCode,
+    lineId: line.id,
+    sj: c.serviceJourney.id,
     from: from.name,
     // alle stopp videre på turen, med rutetid
     stops: c.serviceJourneyEstimatedCalls.next.map(n => ({
@@ -811,11 +838,13 @@ class Board {
   hideStops() { if (this.pop && !this.pop.hidden) this.pop.hidden = true; }
 
   /* Samme boks som stoppene, med fergens navn og appens versjon */
-  showVersion(anchor) {
-    if (!this.pop.hidden && this.pop.dataset.key === "version") { this.hideStops(); return; }
-    this.pop.dataset.key = "version";
-    this.pop.innerHTML = `<div class="sp-head">Fergen heter</div><div class="sp-stop target">MF FERGEWEB ${VERSION.number}</div>` +
-      `<div class="sp-head" style="margin-top:6px">FergeWeb versjon ${VERSION.number} · ${versionDate()}</div>`;
+  showFerryInfo(anchor) {
+    if (!this.pop.hidden && this.pop.dataset.key === "ferry") { this.hideStops(); return; }
+    const f = anchor.info ?? {};
+    this.pop.dataset.key = "ferry";
+    this.pop.innerHTML = `<div class="sp-head">Fergen heter</div><div class="sp-stop target">${esc(f.hull ?? "")}</div>` +
+      `<div class="sp-head" style="margin-top:6px">${esc(f.source ?? "")}</div>` +
+      `<div class="sp-head">FergeWeb versjon ${VERSION.number} · ${versionDate()}</div>`;
     this.placePop(anchor);
   }
 
@@ -973,6 +1002,57 @@ function pointOnRoute(scene, t) {  // t = 0 ved venstre kai, 1 ved høyre
   };
 }
 
+/* ---------- Ekte posisjon fra Entur (sanntid for fartøy) ---------- */
+const VEHICLE_API = "https://api.entur.io/realtime/v2/vehicles/graphql";
+const VEHICLE_POLL = 20e3;            // hent posisjoner så ofte
+const VEHICLE_MAX_AGE = 5 * 60e3;     // eldre posisjoner brukes ikke; da brukes anslaget
+const VEHICLE_NAME_AGE = 3 * HOUR;    // navnet brukes også mellom turene, når bare én ferge er sett så lenge
+
+/* Fergene på sambandets linjer, siste melding per fartøy */
+async function pollVehicles(board) {
+  if (board.isOffline()) return;
+  const lines = [...new Set([...board.L.values(), ...board.R.values()].map(d => d.lineId).filter(Boolean))];
+  if (!lines.length) return;
+  const query = "{ " + lines.map((l, i) => `v${i}: vehicles(lineRef: ${JSON.stringify(l)}) {
+      vehicleId lastUpdated location { latitude longitude } serviceJourney { id } }`).join(" ") + " }";
+  try {
+    const res = await fetch(VEHICLE_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ET-Client-Name": CLIENT_NAME },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    const latest = new Map();
+    for (const list of Object.values(json.data ?? {})) for (const v of list ?? []) {
+      const updated = Date.parse(v.lastUpdated);
+      if (!v.location || !(updated > (latest.get(v.vehicleId)?.updated ?? 0))) continue;
+      latest.set(v.vehicleId, { id: v.vehicleId, lat: v.location.latitude, lng: v.location.longitude, updated, sj: v.serviceJourney?.id });
+    }
+    // faktisk fart langs ruten, fra forrige og siste melding (brukes mellom meldingene)
+    for (const v of latest.values()) {
+      const prev = board.vehicles?.get(v.id);
+      const a = prev && routeT(prev.lat, prev.lng), b = routeT(v.lat, v.lng);
+      if (a && b && v.updated > prev.updated && v.sj === prev.sj) v.vt = (b.t - a.t) / (v.updated - prev.updated);
+      else if (prev?.updated === v.updated) v.vt = prev.vt;
+    }
+    board.vehicles = latest;
+  } catch { /* ingen sanntid nå: anslaget brukes */ }
+}
+
+/* Hvor langt langs ruten (0 = venstre kai, 1 = høyre) en posisjon er, og hvor langt fra ruten den ligger */
+function routeT(lat, lng) {
+  const { left: A, right: B } = CONFIG;
+  if (A.lat == null || B.lat == null) return null;
+  const k = Math.cos(A.lat * Math.PI / 180);            // lengdegrader er kortere mot nord
+  const bx = (B.lng - A.lng) * k, by = B.lat - A.lat;
+  const px = (lng - A.lng) * k, py = lat - A.lat;
+  const len2 = bx * bx + by * by;
+  const t = (px * bx + py * by) / len2;
+  const off = Math.abs(px * by - py * bx) / len2;       // avstand fra ruten, i rutelengder
+  return { t, off };
+}
+
 /* " via Vassdalsvik" når turen går innom andre kaier før motsatt side */
 function viaText(d) {
   const i = d.stops.findIndex(x => x.target);
@@ -988,12 +1068,50 @@ function ferryState(board, now) {
   ].filter(d => !d.cancelled).sort((a, b) => a.expected - b.expected);
   const name = s => (s === "l" ? board.left : board.right).name;
 
+  // ekte posisjon fra sanntid, når den er fersk og ligger nær ruten
+  const live = [...(board.vehicles?.values() ?? [])]
+    .filter(v => now - v.updated < VEHICLE_MAX_AGE)
+    .map(v => ({ v, r: routeT(v.lat, v.lng) }))
+    .filter(({ r }) => r && r.t > -0.3 && r.t < 1.3 && r.off < 0.5);
+  if (live.length) {
+    const ferries = live.map(({ v, r }) => {
+      const trip = trips.find(d => d.sj === v.sj && d.expected <= now && now < d.arrival);
+      let t = Math.min(1, Math.max(0, r.t));
+      if (trip) {
+        // fremskriv fra siste melding, så fergen glir jevnt mellom meldingene: med fergens faktiske fart
+        // når den er kjent, ellers rutetidens. Maks 90 s frem, så feilen blir liten om farten endres.
+        const dir = trip.from === "l" ? 1 : -1;
+        const planned = dir / (trip.arrival - trip.expected);
+        // kjent fart: står den stille eller går feil vei (f.eks. ved kai før avgang), flyttes den ikke
+        const rate = v.vt == null ? planned
+                   : Math.sign(v.vt) === dir ? Math.min(Math.abs(v.vt), 2 * Math.abs(planned)) * dir : 0;
+        t += rate * Math.min(now - v.updated, 90e3);
+        t = Math.min(1, Math.max(0, t));
+      } else if (t < 0.15 || t > 0.85) {
+        t = Math.round(t);   // ligger ved kai
+      }
+      return { t, moving: !!trip, leftward: trip?.from === "r", trip, vessel: v.id, live: v.updated };
+    }).sort((a, b) => b.moving - a.moving);
+    const f = ferries[0];
+    if (f.moving) {
+      return { ferries, text: `Underveis til ${name(f.trip.to)}${viaText(f.trip)} · ankomst ca. ${hhmm(f.trip.arrival)}` };
+    }
+    const side = f.t < 0.5 ? "l" : "r";
+    const next = trips.find(d => d.from === side && d.expected > now);
+    const where = f.t === 0 || f.t === 1 ? `Ved ${name(side)}` : `Nær ${name(side)}`;
+    return { ferries, text: where + (next ? ` · neste avgang ${hhmm(next.expected)}` : "") };
+  }
+
+  // ingen fersk posisjon: anslag. Er bare én ferge sett på sambandet i det siste, er det den.
+  const seen = [...(board.vehicles?.values() ?? [])].filter(v => now - v.updated < VEHICLE_NAME_AGE);
+  const vessel = seen.length === 1 ? seen[0].id : undefined;
+
   const active = trips.filter(d => d.expected <= now && now < d.arrival);
   if (active.length) {
     return {
       ferries: active.map(d => {
         const p = (now - d.expected) / (d.arrival - d.expected);
-        return { t: d.from === "l" ? p : 1 - p, moving: true, leftward: d.from === "r", trip: d };
+        return { t: d.from === "l" ? p : 1 - p, moving: true, leftward: d.from === "r", trip: d, vessel };
       }),
       text: `Underveis til ${name(active[0].to)}${viaText(active[0])} · ankomst ca. ${hhmm(active[0].arrival)}`,
     };
@@ -1004,7 +1122,7 @@ function ferryState(board, now) {
   if (!side) return { ferries: [], text: "" };
   const next = trips.find(d => d.from === side && d.expected > now);
   return {
-    ferries: [{ t: side === "l" ? 0 : 1, moving: false, leftward: false }],
+    ferries: [{ t: side === "l" ? 0 : 1, moving: false, leftward: false, vessel }],
     text: `Ved ${name(side)}` + (next ? ` · neste avgang ${hhmm(next.expected)}` : ""),
   };
 }
@@ -1014,11 +1132,9 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 function makeFerry(board) {
   const g = document.createElementNS(SVG_NS, "g");
   g.classList.add("ferry", "vessel");
-  // fergen heter "MF FERGEWEB <versjon>": hint ved musepeker, boks ved klikk/trykk
-  const title = document.createElementNS(SVG_NS, "title");
-  title.textContent = versionText();
-  g.append(title);
-  g.addEventListener("click", e => { e.stopPropagation(); board.showVersion(g); });
+  // navn og kilde for posisjon: hint ved musepeker, boks ved klikk/trykk (settes i updateFerry)
+  g.append(document.createElementNS(SVG_NS, "title"));
+  g.addEventListener("click", e => { e.stopPropagation(); board.showFerryInfo(g); });
   for (const [cls, ref] of [["wake", "#wakeShape"], ["bob", "#ferryShape"]]) {
     const inner = document.createElementNS(SVG_NS, "g");
     inner.classList.add(cls);
@@ -1029,6 +1145,9 @@ function makeFerry(board) {
   }
   // navigasjonslys (vises bare i mørket): hvitt topplys i masta, og sidelys på brua.
   // Fergen sees fra siden: går den mot høyre, vender styrbord (grønt) mot oss; mot venstre babord (rødt).
+  // skipsnavnet på skroget
+  g.querySelector(".bob").insertAdjacentHTML("beforeend", `<text class="hullname" y="-18.6" text-anchor="middle" fill="#fff"
+    font-size="7" font-weight="700" font-family="system-ui, sans-serif" letter-spacing=".6"></text>`);
   g.querySelector(".bob").insertAdjacentHTML("beforeend", `<g class="lights">
     <g class="navlight mast"><circle class="glow" cy="-76" r="20"/><circle cy="-76" r="5"/></g>
     <g class="navlight starboard"><circle class="glow" cx="24" cy="-51" r="20"/><circle cx="24" cy="-51" r="5"/></g>
@@ -1082,6 +1201,14 @@ function updateFerry(board) {
       el.style.transform = `translate(${p.x}px, ${p.y}px) scale(${p.scale})`;
       el.classList.toggle("moving", f.moving);
       el.classList.toggle("leftward", f.leftward);
+      // skipsnavn fra listen over kjente fartøy, ellers appens eget navn med versjon
+      const vname = VESSELS[f.vessel];
+      const hull = vname ? `MF ${vname.toLocaleUpperCase("nb")}` : `MF FERGEWEB ${VERSION.number}`;
+      const source = f.live ? `Posisjon fra sanntid kl. ${hhmm(f.live)}` : "Beregnet posisjon (ingen sanntid)";
+      el.info = { hull, source };
+      const hn = el.querySelector(".hullname");
+      if (hn.textContent !== hull) hn.textContent = hull;
+      el.querySelector("title").textContent = `${hull} – ${source}`;
       // lyskjeglen ligger midt på fergen, litt over vannlinjen
       if (spots) spots.children[i].style.transform = `translate(${p.x}px, ${p.y - 25 * p.scale}px) scale(${p.scale})`;
 
@@ -1147,18 +1274,19 @@ function updateSky() {
   map.classList.toggle("dark", alt < -0.833);      // sola er nede: navigasjonslys på
 }
 
-/* Posisjonen til fergeleiet til venstre, fra Entur */
-async function loadLeftPosition() {
-  const key = "fergeweb.posisjon." + nsrNum(CONFIG.left.id);   // husket, så fargetonen virker uten nett
-  let pos = null;
-  try { pos = JSON.parse(localStorage.getItem(key)); } catch {}
-  if (!pos) {
-    const d = await gql("query($id: String!) { stopPlace(id: $id) { latitude longitude } }", { id: CONFIG.left.id });
-    pos = { lat: d.stopPlace?.latitude, lng: d.stopPlace?.longitude };
-    try { localStorage.setItem(key, JSON.stringify(pos)); } catch {}
+/* Posisjonen til begge fergeleiene, fra Entur. Huskes, så den virker uten nett. */
+async function loadPositions() {
+  for (const place of [CONFIG.left, CONFIG.right]) {
+    const key = "fergeweb.posisjon." + nsrNum(place.id);
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem(key)); } catch {}
+    if (!pos) {
+      const d = await gql("query($id: String!) { stopPlace(id: $id) { latitude longitude } }", { id: place.id });
+      pos = { lat: d.stopPlace?.latitude, lng: d.stopPlace?.longitude };
+      try { localStorage.setItem(key, JSON.stringify(pos)); } catch {}
+    }
+    Object.assign(place, pos);
   }
-  CONFIG.left.lat = pos.lat;
-  CONFIG.left.lng = pos.lng;
 }
 
 /* ---------- Skilt ved fergeleiene ---------- */
@@ -1412,7 +1540,7 @@ function initPairDialog() {
 
 /* ---------- Versjon ---------- */
 const versionDate = () => new Date(VERSION.date + "T12:00:00Z").toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
-const versionText = () => `MF FERGEWEB ${VERSION.number} – FergeWeb versjon ${VERSION.number}, ${versionDate()}`;
+
 
 /* ---------- Oppstart ---------- */
 const statusEl = document.getElementById("status");
@@ -1447,7 +1575,6 @@ async function main() {
   const { left, right } = CONFIG;
   setTitle();
   initPairDialog();
-  document.getElementById("ferryName").textContent = `MF FERGEWEB ${VERSION.number}`;
 
   new ResizeObserver(refreshSigns).observe(document.getElementById("map"));
   window.addEventListener("resize", refreshSigns);
@@ -1456,7 +1583,7 @@ async function main() {
   const board = new Board(left, right);
 
   // fargetone etter sola på venstre side, oppdateres hvert minutt
-  loadLeftPosition().then(() => { updateSky(); setInterval(updateSky, 60e3); }).catch(() => {});
+  loadPositions().then(() => { updateSky(); setInterval(updateSky, 60e3); }).catch(() => {});
 
   tickClock();
   setInterval(tickClock, 1000);
@@ -1471,6 +1598,9 @@ async function main() {
   board.updateNowButton();
   updateFerry(board);
   setInterval(() => updateFerry(board), 1000);
+  // ekte posisjoner fra sanntid
+  pollVehicles(board).then(() => updateFerry(board));
+  setInterval(() => pollVehicles(board), VEHICLE_POLL);
 
   setInterval(async () => {
     try {
