@@ -111,7 +111,6 @@
     background: linear-gradient(var(--sky1) 50%, var(--sea2) 50%);
     display: flex; align-items: center;
   }
-  .map[data-mode="simple"] { aspect-ratio: 400 / 260; width: min(100%, 32vh * 400 / 260); }
   /* fotoet: farger fra øverste og nederste kant, dempet som resten av bildet */
   .map[data-mode="fancy"] { background: linear-gradient(#729bc0 50%, #507894 50%); }
   .map .scene { width: 100%; height: 100%; display: block; }
@@ -293,7 +292,8 @@
     <div class="ferrystatus" id="ferryStatus" aria-live="polite"></div>
 
     <!-- Enkelt bilde: tegnet fjord -->
-    <svg class="scene" data-scene="simple" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg class="scene" data-scene="simple" viewBox="0 30 400 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <!-- utsnitt 2:1, samme form som fotoet, så bildet tar like lite høyde på mobil -->
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="var(--sky1)"/><stop offset="1" stop-color="var(--sky2)"/>
@@ -450,7 +450,7 @@ const VESSELS = {
 };
 
 // Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
-const VERSION = { number: 15, date: "2026-10-06" };
+const VERSION = { number: 16, date: "2026-10-06" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";

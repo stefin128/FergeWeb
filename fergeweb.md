@@ -17,7 +17,7 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 
 ### Valg av bilde
 - I toppen kan man velge mellom to bilder: **Enkel** og **Foto**. Valget huskes i nettleseren, og standard er Foto.
-- **Enkel** er en tegnet fjord med et skilt med stedsnavnet ved hvert fergeleie (se Store skilt). Den følger lys og mørk modus.
+- **Enkel** er en tegnet fjord med et skilt med stedsnavnet ved hvert fergeleie (se Store skilt). Den følger lys og mørk modus. Den har samme form som fotoet (2:1), så begge bildene tar like lite høyde, og listen får mer plass på mobil.
 - **Foto** er bildet `bare_fjorden_navn` med stedsnavnene i bildet. Bildet er dempet med et lett dis: fargene beholdes, men med lavere kontrast og litt lysere (ikke gråtoner). Kaiene med skilt og et område rundt fergen vises i full farge, slik at båten og kaiene fremheves. Fremhevingen av fergen følger den over fjorden.
 
 ### Døgnrytme i bildet
