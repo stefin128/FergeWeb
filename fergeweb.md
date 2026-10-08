@@ -39,13 +39,22 @@ Drar man i listen over avganger skal den vise videre fremover ved å dra oppover
 - Webkameraene kan ikke finnes automatisk. Vegvesenets åpne API for webkamera (DATEX II) krever brukernavn og passord, og det kan ikke ligge i en offentlig fil. API-et som vegvesen.no selv bruker, er internt og ikke ment for andre. Adressene legges derfor inn manuelt, og ved konfigurasjon senere må de inngå i oppsettet for hvert fergeleie.
 
 ### Fergens posisjon
-- **Ekte posisjon:** Appen henter hvert 20. sekund posisjonen til fergene på sambandets linjer fra Entur (sanntid for fartøy, `api.entur.io/realtime/v2/vehicles`). Fergen tegnes der den faktisk er, langs ruten mellom fergeleiene. Posisjonen projiseres på linjen mellom de to kaiene, og fergeleienes posisjon hentes fra Entur.
-- Mellom meldingene flyttes fergen jevnt videre med den farten den faktisk har hatt, høyst 90 sekunder frem. Står den stille, for eksempel ved kai før avgang, blir den stående.
-- Går flere ferger på sambandet, vises alle, for eksempel Bastø IV og Bastø V på Moss–Horten.
+- **Ekte posisjon:** Appen henter hvert minutt posisjonen til fergene på sambandets linjer fra Entur (sanntid for fartøy, `api.entur.io/realtime/v2/vehicles`). Fergen tegnes der den faktisk er, langs ruten mellom fergeleiene. Posisjonen projiseres på linjen mellom de to kaiene, og fergeleienes posisjon hentes fra Entur.
+- Mellom meldingene flyttes fergen jevnt videre med den farten den faktisk har hatt, høyst 2½ minutt frem, så den går jevnt også mellom hentingene. Står den stille, for eksempel ved kai før avgang, blir den stående.
+- Går flere ferger på sambandet, vises alle, for eksempel Bastø IV og Bastø V på Moss–Horten. Hver tegning følger sin ferge (MMSI), så fergene ikke bytter plass i bildet når rekkefølgen fra Entur endrer seg. En ferge som ikke har meldt posisjon på 5 minutter, for eksempel en som ligger i ro ved kai, vises ikke.
 - **Anslag som reserve:** Mangler sanntid eller er den eldre enn 5 minutter, beregnes posisjonen som før: jevnt fra forventet avgang til forventet ankomst. Mellom turene ligger fergen ved kaien den sist kom til. Noen ferger melder bare posisjon når de er på tur (f.eks. Misten–Festvåg), så ved kai brukes anslaget.
 - Fergen tegnes i bildet der den antas å være akkurat nå, og flyttes hvert sekund. Når den ligger ved kai, ligger den inntil fergeleiet. Under overfart går den i en bue litt nærmere betrakteren, tegnes litt større midt i fjorden, vugger svakt og har kjølvann bak seg.
 - Nederst i bildet står en statuslinje, for eksempel «Underveis til Festvåg · ankomst ca. 19:10» eller «Ved Misten · neste avgang 19:15».
 - Innstilte avganger regnes ikke med.
+
+### Flere ferger underveis
+På samband med flere ferger (f.eks. Moss–Horten) kan visningen velges i ⚙-dialogen, i valglisten **«Flere ferger underveis»** nederst. Valget huskes i nettleseren. Alternativene er laget for å prøve ut hva som fungerer best:
+- **Som nå:** alle ferger på samme bue, og statuslinjen nevner én ferge.
+- **A: Kjørefelt:** ferger mot høyre går i en bue nærmere betrakteren, ferger mot venstre i en bue lenger inn i fjorden (litt mindre). Ferger som møtes, overlapper ikke, og retningen ses med en gang. Det enkle bildet viser to stiplede kjørefelt.
+- **B: Merkelapper:** når to eller flere ferger er underveis, står en lapp over hver med navn, retning og ankomst, f.eks. «Bastø IV ← 19:55». Lapper som ville overlappet, stables over hverandre.
+- **C: Status for alle:** statuslinjen nevner alle fergene underveis og første ankomst til hver side, f.eks. «3 ferger underveis · til Moss 19:55, til Horten 19:46».
+- **D: Kobling til listen:** avganger som pågår, viser navnet på fergen i listen (f.eks. «19:25 Bastø IV»). Trykker man på en ferge i bildet, scrolles listen til avgangen den går, og avgangen markeres i noen sekunder. Entur oppgir fergen bare for turer som er i gang, så framtidige avganger får ikke navn.
+- **A + C** er standard. **Alle** slår på alle fire.
 
 ### Fergens navn
 - Entur oppgir hvilken ferge som går hver tur (MMSI-nummer, skipets faste AIS-id), men ikke navnet. Navnet hentes fra en liste i appen (`VESSELS`), med 89 ferger på bilferjelinjene per oktober 2026. Navnene er hentet fra Kystverkets åpne AIS-data og rettet til norsk skrivemåte (AIS kan ikke skrive æ, ø og å).

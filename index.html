@@ -197,6 +197,17 @@
   }
   .stopspop[hidden] { display: none; }
   .ferryicon { cursor: pointer; transition: transform 1s linear; }
+  /* A: kjørefelt i det enkle bildet */
+  .map.lanes .route-center, .map:not(.lanes) .route-lane { display: none; }
+  /* B: merkelapp over fergen */
+  .ferrylabel { pointer-events: none; transition: transform 1s linear; }
+  .ferrylabel rect { fill: var(--panel); stroke: var(--line); stroke-width: 1; opacity: .92; }
+  .ferrylabel text { font: 600 11px system-ui, sans-serif; fill: var(--text); }
+  /* D: navn på fergen i listen, og markering av avgangen */
+  .cell .vname { font-size: .75rem; color: var(--accent); white-space: nowrap; }
+  .cell.linked { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .dlg-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: .85rem; }
+  .dlg-foot select { margin-left: auto; font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
   .vessel { cursor: pointer; }
   .map .tint { pointer-events: none; transition: opacity 2s, fill 2s; }
   /* Navigasjonslys: bare når sola er nede. Sidelys bare under fart, i fartsretningen. */
@@ -309,13 +320,16 @@
       <path d="M400 105 C360 112 330 135 322 170 C316 205 345 240 400 260Z" fill="var(--land2)"/>
       <rect x="70" y="172" width="22" height="6" fill="#8a7a66"/>
       <rect x="308" y="172" width="22" height="6" fill="#8a7a66"/>
-      <path d="M92 182 Q200 200 308 182" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-dasharray="6 6"/>
+      <path class="route-center" d="M92 182 Q200 200 308 182" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-dasharray="6 6"/>
+      <path class="route-lane" d="M92 182 Q200 176 308 182" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="6 6"/>
+      <path class="route-lane" d="M92 182 Q200 216 308 182" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-dasharray="6 6"/>
       <rect class="tint" width="400" height="260" opacity="0"/>
       <g class="ferries"></g>
       <!-- Skilt ved hvert fergeleie: stolpe fra kaia og en tavle med stedsnavnet -->
       <g class="sign" data-side="l"><rect class="pole"/><rect class="board"/><text></text></g>
       <g class="sign" data-side="r"><rect class="pole"/><rect class="board"/><text></text></g>
       <g class="ferryicons"></g>
+      <g class="ferrylabels"></g>
     </svg>
 
     <!-- Foto: dempet bilde, med kaier/skilt og fergen fremhevet i full farge -->
@@ -348,6 +362,7 @@
       <g class="sign" data-side="r"><rect class="board"/><text></text></g>
       <g class="ferries"></g>
       <g class="ferryicons"></g>
+      <g class="ferrylabels"></g>
     </svg>
 
     <!-- Fergen og kjølvannet, felles for begge bildene -->
@@ -396,6 +411,10 @@
   </div>
   <input type="search" id="pairSearch" placeholder="Søk etter sted …" autocomplete="off" aria-label="Søk etter sted">
   <div class="pairlist" id="pairList"></div>
+  <div class="dlg-foot">
+    <label for="multiMode">Flere ferger underveis</label>
+    <select id="multiMode"></select>
+  </div>
 </dialog>
 
 <script>
@@ -450,7 +469,7 @@ const VESSELS = {
 };
 
 // Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
-const VERSION = { number: 16, date: "2026-10-06" };
+const VERSION = { number: 17, date: "2026-10-08" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -791,6 +810,7 @@ class Board {
     if (!d) return el("div", "cell none", "–");
     const past = isPast(d, now);
     const c = el("div", "cell");
+    c.dataset.key = d.key;
     if (past) c.classList.add("past");
     if (d.cancelled) c.classList.add("cancelled");
     if (d.key === nextKey) c.classList.add("next");
@@ -807,9 +827,14 @@ class Board {
       ? `<span class="via">→ ${esc(d.stops[0].name)}</span>` +
         `<button type="button" class="stopsbtn" data-key="${esc(d.key)}" title="${esc(all)}" aria-label="Alle stopp: ${esc(all)}">${ROUTE_ICON}</button>`
       : "";
+    // D: navnet på fergen som går turen nå (Entur oppgir fergen bare for turer som er i gang)
+    // (samme tur har samme id hver dag, så bare avganger som pågår nå: fra 10 min før avgang til 5 min etter ankomst)
+    const ongoing = d.expected - 10 * 60e3 <= now && now <= d.arrival + 5 * 60e3;
+    const vessel = multiHas("D") && ongoing && [...(this.vehicles?.values() ?? [])].find(v => v.sj === d.sj && now - v.updated < VEHICLE_MAX_AGE);
+    const vname = vessel && VESSELS[vessel.id] ? `<span class="vname">${esc(VESSELS[vessel.id])}</span>` : "";
     c.innerHTML =
       `<span class="t">${delayed ? `<span class="old">${hhmm(d.aimed)}</span>` : ""}${hhmm(shown)}</span>` +
-      tag + via +
+      tag + via + vname +
       `<span class="until">${past || d.cancelled ? "" : until(shown)}</span>`;
     return c;
   }
@@ -837,10 +862,21 @@ class Board {
 
   hideStops() { if (this.pop && !this.pop.hidden) this.pop.hidden = true; }
 
+  /* D: vis og marker avgangen fergen går, i listen */
+  highlightTrip(key) {
+    const cell = this.rowsEl.querySelector(`.cell[data-key="${CSS.escape(key)}"]`);
+    if (!cell) return;
+    const row = cell.closest(".row");
+    this.scroller.scrollTo({ top: row.offsetTop - this.stickyHeight() - row.offsetHeight, behavior: "smooth" });
+    cell.classList.add("linked");
+    setTimeout(() => cell.classList.remove("linked"), 4000);
+  }
+
   /* Samme boks som stoppene, med fergens navn og appens versjon */
   showFerryInfo(anchor) {
     if (!this.pop.hidden && this.pop.dataset.key === "ferry") { this.hideStops(); return; }
     const f = anchor.info ?? {};
+    if (multiHas("D") && f.tripKey) this.highlightTrip(f.tripKey);
     this.pop.dataset.key = "ferry";
     this.pop.innerHTML = `<div class="sp-head">Fergen heter</div><div class="sp-stop target">${esc(f.hull ?? "")}</div>` +
       `<div class="sp-head" style="margin-top:6px">${esc(f.source ?? "")}</div>` +
@@ -983,28 +1019,43 @@ const SCENES = {
     ctrl: { x: 200, y: 198 },   // kontrollpunkt for buen over fjorden
     size: 0.22,                  // fergens størrelse i dette bildet
     midScale: 0,                 // ekstra størrelse midt i fjorden (perspektiv)
+    lanes: { far: -24, near: 16 },   // kjørefelt (A): mot venstre lenger inn, mot høyre nærmere
   },
   fancy: {
     dock: { l: { x: 454, y: 498 }, r: { x: 1326, y: 510 } },
     ctrl: { x: 890, y: 590 },   // buen går litt nærmere betrakteren midt i fjorden
     size: 1,
     midScale: 0.12,
+    lanes: { far: -80, near: 60 },
   },
 };
 
-function pointOnRoute(scene, t) {  // t = 0 ved venstre kai, 1 ved høyre
+// t = 0 ved venstre kai, 1 ved høyre. lane: 0 = midt, -1 = kjørefeltet lenger inn (mot venstre), 1 = nærmest (mot høyre)
+function pointOnRoute(scene, t, lane = 0) {
   const { dock: { l, r }, ctrl } = scene;
+  const cy = ctrl.y + (lane < 0 ? scene.lanes.far : lane > 0 ? scene.lanes.near : 0);
   const u = 1 - t;
+  const depth = lane < 0 ? 0.9 : 1;   // lenger inn = litt mindre
   return {
     x: u * u * l.x + 2 * u * t * ctrl.x + t * t * r.x,
-    y: u * u * l.y + 2 * u * t * ctrl.y + t * t * r.y,
-    scale: scene.size * (1 + scene.midScale * Math.sin(Math.PI * t)),
+    y: u * u * l.y + 2 * u * t * cy + t * t * r.y,
+    scale: scene.size * depth * (1 + scene.midScale * Math.sin(Math.PI * t)),
   };
 }
 
+/* ---------- Flere ferger underveis: valgfri visning (velges i ⚙-dialogen) ---------- */
+const MULTI_KEY = "fergeweb.flereFerger";
+const MULTI_MODES = {
+  now: "Som nå", A: "A: Kjørefelt", B: "B: Merkelapper", C: "C: Status for alle",
+  D: "D: Kobling til listen", AC: "A + C (anbefalt)", all: "Alle (A + B + C + D)",
+};
+let multiMode = "AC";
+const multiHas = x => multiMode === "all" || multiMode === x || (multiMode === "AC" && (x === "A" || x === "C"));
+
 /* ---------- Ekte posisjon fra Entur (sanntid for fartøy) ---------- */
 const VEHICLE_API = "https://api.entur.io/realtime/v2/vehicles/graphql";
-const VEHICLE_POLL = 20e3;            // hent posisjoner så ofte
+const VEHICLE_POLL = 60e3;            // hent posisjoner så ofte
+const VEHICLE_AHEAD = 150e3;          // flytt fergen videre så lenge etter siste melding (dekker ett minutt mellom hentingene)
 const VEHICLE_MAX_AGE = 5 * 60e3;     // eldre posisjoner brukes ikke; da brukes anslaget
 const VEHICLE_NAME_AGE = 3 * HOUR;    // navnet brukes også mellom turene, når bare én ferge er sett så lenge
 
@@ -1079,13 +1130,13 @@ function ferryState(board, now) {
       let t = Math.min(1, Math.max(0, r.t));
       if (trip) {
         // fremskriv fra siste melding, så fergen glir jevnt mellom meldingene: med fergens faktiske fart
-        // når den er kjent, ellers rutetidens. Maks 90 s frem, så feilen blir liten om farten endres.
+        // når den er kjent, ellers rutetidens. Maks VEHICLE_AHEAD frem, så feilen blir liten om farten endres.
         const dir = trip.from === "l" ? 1 : -1;
         const planned = dir / (trip.arrival - trip.expected);
         // kjent fart: står den stille eller går feil vei (f.eks. ved kai før avgang), flyttes den ikke
         const rate = v.vt == null ? planned
                    : Math.sign(v.vt) === dir ? Math.min(Math.abs(v.vt), 2 * Math.abs(planned)) * dir : 0;
-        t += rate * Math.min(now - v.updated, 90e3);
+        t += rate * Math.min(now - v.updated, VEHICLE_AHEAD);
         t = Math.min(1, Math.max(0, t));
       } else if (t < 0.15 || t > 0.85) {
         t = Math.round(t);   // ligger ved kai
@@ -1164,10 +1215,20 @@ function makeSpot() {
   return e;
 }
 
-/* Sørg for at gruppen har akkurat n barn */
-function syncChildren(g, n, make) {
-  while (g.children.length > n) g.lastChild.remove();
-  while (g.children.length < n) g.append(make());
+/* Ett element per id i gruppen, i samme rekkefølge som ids. Elementene følger id-en (fergen), ikke plassen
+   i listen, så en ferge aldri "glir" over til en annens plass når rekkefølgen fra Entur endrer seg. */
+function keyedChildren(g, ids, make) {
+  const old = new Map([...g.children].map(el => [el.dataset.id, el]));
+  const els = ids.map(id => {
+    let el = old.get(id);
+    if (el) old.delete(id);
+    else { el = make(); el.dataset.id = id; }
+    return el;
+  });
+  for (const el of old.values()) el.remove();
+  // flytt bare elementer som står feil (flytting avbryter animasjonene)
+  els.forEach((el, i) => { if (g.children[i] !== el) g.insertBefore(el, g.children[i] ?? null); });
+  return els;
 }
 
 /* Ruteikon over fergen når turen har flere stopp; samme hint og boks som ikonet i listen */
@@ -1188,16 +1249,21 @@ function updateFerry(board) {
     const box = svg.getBoundingClientRect();
     const [, , vbW, vbH] = svg.getAttribute("viewBox").split(" ").map(Number);
     const px = box.width ? Math.min(box.width / vbW, box.height / vbH) : 1;
-    const icons = svg.querySelector(".ferryicons");
-    syncChildren(icons, ferries.length, () => makeFerryIcon(board));
-    const g = svg.querySelector(".ferries");
-    syncChildren(g, ferries.length, () => makeFerry(board));
+    // fast id per ferge: MMSI fra sanntid, ellers turen, ellers "ved kai"
+    const ids = ferries.map(f => f.vessel ?? f.trip?.key ?? "kai");
+    const iconEls = keyedChildren(svg.querySelector(".ferryicons"), ids, () => makeFerryIcon(board));
+    const ferryEls = keyedChildren(svg.querySelector(".ferries"), ids, () => makeFerry(board));
     const spots = svg.querySelector(".spots");
-    if (spots) syncChildren(spots, ferries.length, makeSpot);
+    const spotEls = spots ? keyedChildren(spots, ids, makeSpot) : [];
+    const labelEls = keyedChildren(svg.querySelector(".ferrylabels"), ids, makeLabel);
+    const movingCount = ferries.filter(f => f.moving).length;
+    const labels = [];   // merkelapper legges ut til slutt, uten å overlappe hverandre
 
     ferries.forEach((f, i) => {
-      const p = pointOnRoute(scene, f.t);
-      const el = g.children[i];
+      // A: ferger underveis går i hvert sitt kjørefelt etter retning
+      const lane = multiHas("A") && f.moving ? (f.leftward ? -1 : 1) : 0;
+      const p = pointOnRoute(scene, f.t, lane);
+      const el = ferryEls[i];
       el.style.transform = `translate(${p.x}px, ${p.y}px) scale(${p.scale})`;
       el.classList.toggle("moving", f.moving);
       el.classList.toggle("leftward", f.leftward);
@@ -1205,27 +1271,104 @@ function updateFerry(board) {
       const vname = VESSELS[f.vessel];
       const hull = vname ? `MF ${vname.toLocaleUpperCase("nb")}` : `MF FERGEWEB ${VERSION.number}`;
       const source = f.live ? `Posisjon fra sanntid kl. ${hhmm(f.live)}` : "Beregnet posisjon (ingen sanntid)";
-      el.info = { hull, source };
+      el.info = { hull, source, tripKey: f.trip?.key };
+
+      // B: merkelapp med navn, retning og ankomst over hver ferge underveis, når flere er underveis
+      const lab = labelEls[i];
+      const showLabel = multiHas("B") && f.moving && f.trip && movingCount >= 2;
+      if (!showLabel) hide(lab);
+      else {
+        const k = 1 / px, multiStop = f.trip.stops.length > 1;
+        const text = `${vname ? vname + " " : ""}${f.leftward ? "←" : "→"} ${hhmm(f.trip.arrival)}`;
+        if (lab.dataset.text !== text) {
+          lab.dataset.text = text;
+          lab.querySelector("text").textContent = text;
+          const w = textWidth(text, 11) * 0.95 + 12;   // bredden måles som for skiltene
+          const r = lab.querySelector("rect");
+          r.setAttribute("x", -w / 2); r.setAttribute("width", w);
+          lab.dataset.w = w;
+        }
+        labels.push({ lab, x: p.x, y: p.y - 76 * p.scale - (multiStop ? 44 : 18) * k, w: +lab.dataset.w * k, h: 20 * k, k });
+      }
       const hn = el.querySelector(".hullname");
       if (hn.textContent !== hull) hn.textContent = hull;
       el.querySelector("title").textContent = `${hull} – ${source}`;
       // lyskjeglen ligger midt på fergen, litt over vannlinjen
-      if (spots) spots.children[i].style.transform = `translate(${p.x}px, ${p.y - 25 * p.scale}px) scale(${p.scale})`;
+      if (spots) spotEls[i].style.transform = `translate(${p.x}px, ${p.y - 25 * p.scale}px) scale(${p.scale})`;
 
       // ruteikon over masten, bare på turer med flere stopp
-      const icon = icons.children[i], d = f.trip;
+      const icon = iconEls[i], d = f.trip;
       const multi = d?.stops.length > 1;
-      icon.style.display = multi ? "" : "none";
-      if (!multi) return;
+      if (!multi) { hide(icon); return; }
+      show(icon);
       const k = 1 / px;   // ikonet tegnes i skjermpiksler
-      icon.style.transform = `translate(${p.x}px, ${p.y - 76 * p.scale - 16 * k}px) scale(${k})`;
+      place(icon, `translate(${p.x}px, ${p.y - 76 * p.scale - 16 * k}px) scale(${k})`);
       if (icon.dataset.key !== d.key) {
         icon.dataset.key = d.key;
         icon.querySelector("title").textContent = "Alle stopp: " + d.stops.map(x => `${hhmm(x.time)} ${x.name}`).join(", ");
       }
     });
+
+    // B: flytt merkelapper oppover til de ikke overlapper noen som allerede er lagt ut
+    const placed = [];
+    for (const L of labels.sort((a, b) => b.y - a.y)) {
+      let y = L.y;
+      while (placed.some(P => Math.abs(P.x - L.x) < (P.w + L.w) / 2 + 2 * L.k && Math.abs(P.y - y) < L.h)) y -= L.h;
+      placed.push({ ...L, y });
+      show(L.lab);
+      place(L.lab, `translate(${L.x}px, ${y}px) scale(${L.k})`);
+    }
   }
-  document.getElementById("ferryStatus").textContent = text;
+  // C: statuslinjen nevner alle fergene underveis, med første ankomst til hver side
+  const moving = ferries.filter(f => f.moving && f.trip);
+  let status = text;
+  if (multiHas("C") && moving.length >= 2) {
+    const parts = ["l", "r"].map(side => {
+      const arr = moving.filter(f => f.trip.to === side).map(f => f.trip.arrival);
+      return arr.length ? `til ${(side === "l" ? board.left : board.right).name} ${hhmm(Math.min(...arr))}` : null;
+    }).filter(Boolean);
+    status = `${moving.length} ferger underveis · ${parts.join(", ")}`;
+  }
+  document.getElementById("ferryStatus").textContent = status;
+}
+
+/* Flytt et element; når det nettopp er blitt synlig, uten animasjon (ellers glir det inn fra hjørnet) */
+function place(el, transform) {
+  if (el.dataset.shown !== "1") {
+    el.style.transition = "none";
+    el.style.transform = transform;
+    el.getBoundingClientRect();          // ta i bruk posisjonen før animasjonen slås på igjen
+    el.style.transition = "";
+    el.dataset.shown = "1";
+  } else el.style.transform = transform;
+}
+function hide(el) { el.style.display = "none"; el.dataset.shown = "0"; }
+function show(el) { el.style.display = ""; }
+
+function makeLabel() {
+  const g = document.createElementNS(SVG_NS, "g");
+  g.classList.add("ferrylabel");
+  g.innerHTML = `<rect y="-9" height="18" rx="9"/><text y="4" text-anchor="middle"></text>`;
+  return g;
+}
+
+/* Valglisten for visning av flere ferger, i ⚙-dialogen */
+function initMultiMode(board) {
+  try { multiMode = localStorage.getItem(MULTI_KEY) ?? multiMode; } catch {}
+  if (!MULTI_MODES[multiMode]) multiMode = "AC";
+  const sel = document.getElementById("multiMode");
+  for (const [v, label] of Object.entries(MULTI_MODES)) sel.append(new Option(label, v, false, v === multiMode));
+  const apply = () => {
+    document.getElementById("map").classList.toggle("lanes", multiHas("A"));
+    board.renderKeepingPosition();   // D: navn på fergene i listen
+    updateFerry(board);
+  };
+  sel.addEventListener("change", () => {
+    multiMode = sel.value;
+    try { localStorage.setItem(MULTI_KEY, multiMode); } catch {}
+    apply();
+  });
+  apply();
 }
 
 /* ---------- Fargetone etter solhøyden ved fergeleiet til venstre ---------- */
@@ -1524,7 +1667,7 @@ function initPairDialog() {
   search.addEventListener("input", render);
   // begynner man å skrive et annet sted i dialogen, fortsetter det i søkefeltet
   dlg.addEventListener("keydown", e => {
-    if (e.target === search || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target === search || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
     const typed = e.key.length === 1 && e.key !== " ";
     if (!typed && e.key !== "Backspace") return;
     e.preventDefault();
@@ -1599,8 +1742,10 @@ async function main() {
   updateFerry(board);
   setInterval(() => updateFerry(board), 1000);
   // ekte posisjoner fra sanntid
-  pollVehicles(board).then(() => updateFerry(board));
-  setInterval(() => pollVehicles(board), VEHICLE_POLL);
+  initMultiMode(board);
+  const poll = () => pollVehicles(board).then(() => { if (multiHas("D")) board.renderKeepingPosition(); updateFerry(board); });
+  poll();
+  setInterval(poll, VEHICLE_POLL);
 
   setInterval(async () => {
     try {
