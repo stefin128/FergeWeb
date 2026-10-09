@@ -196,6 +196,23 @@
     border: 0; border-radius: 6px; background: transparent; color: var(--delay);
   }
   .notebtn:hover, .notebtn:focus-visible { background: color-mix(in srgb, var(--delay) 15%, transparent); }
+  .alertbtn {
+    display: inline-flex; align-items: center; padding: 3px; margin: 0 -4px; cursor: pointer; align-self: center;
+    border: 0; border-radius: 6px; background: transparent; color: var(--cancel);
+  }
+  .alertbtn:hover, .alertbtn:focus-visible { background: color-mix(in srgb, var(--cancel) 15%, transparent); }
+  .cell.past .alertbtn { color: var(--past); }
+  /* avviksmelding for hele sambandet: stripe øverst i bildet */
+  .alertbar {
+    position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 4;
+    display: flex; align-items: center; gap: 6px; width: max-content; max-width: calc(100% - 16px);
+    padding: 4px 12px; border: 0; border-radius: 14px; cursor: pointer; font: inherit; font-size: .85rem;
+    background: var(--cancel); color: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .3);
+  }
+  .alertbar[hidden] { display: none; }
+  .alertbar .ab-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .alertbar svg { flex: none; }
+  .stopspop .sp-note { white-space: pre-line; }
   .stopspop .sp-note { max-width: 300px; margin-top: 4px; font-variant-numeric: normal; }
   .stopspop .sp-note + .sp-note { margin-top: 8px; }
   .stopspop .sp-note a { color: var(--accent); font-weight: 600; white-space: nowrap; }
@@ -310,6 +327,7 @@
 <main>
   <div class="map" id="map" data-mode="fancy">
     <div class="ferrystatus" id="ferryStatus" aria-live="polite"></div>
+    <button type="button" class="alertbar" id="alertBar" hidden><span class="ab-icon"></span><span class="ab-text"></span></button>
 
     <!-- Enkelt bilde: tegnet fjord -->
     <svg class="scene" data-scene="simple" viewBox="0 30 400 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -478,7 +496,7 @@ const VESSELS = {
 };
 
 // Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
-const VERSION = { number: 18, date: "2026-10-09" };
+const VERSION = { number: 20, date: "2026-10-09" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -513,9 +531,11 @@ query($id: String!, $start: DateTime!, $range: Int!) {
       realtime
       cancellation
       notices { text }
+      situations { ...sit }
       serviceJourney {
         id
         notices { text }
+        situations { ...sit }
         journeyPattern { line { id publicCode transportMode transportSubmode } }
       }
       serviceJourneyEstimatedCalls {
@@ -524,10 +544,18 @@ query($id: String!, $start: DateTime!, $range: Int!) {
           aimedArrivalTime
           expectedArrivalTime
           notices { text }
+          situations { ...sit }
         }
       }
     }
   }
+}
+fragment sit on PtSituationElement {
+  id
+  summary { value language }
+  description { value language }
+  validityPeriod { startTime endTime }
+  affects { __typename }
 }`;
 
 async function gql(query, variables = {}) {
@@ -545,7 +573,15 @@ async function gql(query, variables = {}) {
 async function fetchCalls(from, to, startMs, rangeMs) {
   const data = await gql(QUERY, { id: from.id, start: new Date(startMs).toISOString(), range: Math.round(rangeMs / 1000) });
   const calls = data?.stopPlace?.estimatedCalls ?? [];
-  return calls.map(c => toDeparture(c, from, to)).filter(Boolean);
+  const deps = [], wide = new Map();
+  for (const c of calls) {
+    const d = toDeparture(c, from, to);
+    if (!d) continue;
+    deps.push(d);
+    for (const a of d.wide) wide.set(a.id, a);
+    delete d.wide;
+  }
+  return { deps, wide: [...wide.values()] };
 }
 
 const isStop = (sp, id) => sp && (sp.id === id || sp.parent?.id === id);
@@ -578,6 +614,8 @@ function toDeparture(c, from, to) {
     from: from.name,
     // merknader om at turen, eller en av kaiene, må bestilles på forhånd
     notes: bookingNotes(c, arr, from, to),
+    // avviksmeldinger for denne avgangen; meldinger for hele sambandet samles i fetchCalls
+    ...situationsOf(c, arr),
     // alle stopp videre på turen, med rutetid
     stops: c.serviceJourneyEstimatedCalls.next.map(n => ({
       name: shortName((n.quay.stopPlace.parent ?? n.quay.stopPlace).name),
@@ -609,6 +647,35 @@ function bookingNotes(c, arr, from, to) {
     const scoped = t.replace(/(avgang|ankomst) (fr[aå] )?\p{Lu}\p{L}*/gu, "").split(/[.:]\s+|\s\/\s/).filter(s => STOP_RE.test(s));
     return !scoped.length || scoped.some(s => names.some(re => re.test(s)));
   });
+}
+
+/*
+ * Avviksmeldinger fra Entur (innstilt pga. vær, forsinkelse, redusert kapasitet, fergebytte …).
+ * Meldinger knyttet til én tur gjelder avgangen. Meldinger knyttet til linjen eller en kai på linjen
+ * gjelder hele sambandet og vises i bildet.
+ * På avgangen kommer meldingene først når de gjelder, så turens egne meldinger hentes også. Turen har
+ * samme id hver dag, så de tas bare med når gyldighetsperioden overlapper avgangen.
+ */
+const TRIP_AFFECTS = new Set(["AffectedServiceJourney", "AffectedStopPlaceOnServiceJourney"]);
+
+function situationsOf(c, arr) {
+  const pick = list => (list?.find(v => !v.language || /^(no|nb|nn)$/.test(v.language)) ?? list?.[0])?.value?.trim() ?? "";
+  const alerts = [], wide = [], seen = new Set();
+  const dep = Date.parse(c.aimedDepartureTime), end = Date.parse(arr.aimedArrivalTime);
+  const trip = (c.serviceJourney?.situations ?? []).filter(s =>
+    s.affects?.length && s.affects.every(x => x.__typename === "AffectedServiceJourney") &&
+    !(Date.parse(s.validityPeriod?.startTime ?? "") > end) && !(Date.parse(s.validityPeriod?.endTime ?? "") < dep));
+  for (const s of [...(c.situations ?? []), ...(arr.situations ?? []), ...trip]) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    const summary = pick(s.summary), description = pick(s.description);
+    const text = [summary, description].filter((t, i, a) => t && (i === 0 || t !== a[0])).join("\n");
+    if (!text) continue;
+    const a = { id: s.id, text, start: Date.parse(s.validityPeriod?.startTime ?? "") || null,
+                end: Date.parse(s.validityPeriod?.endTime ?? "") || null };
+    (s.affects?.some(x => TRIP_AFFECTS.has(x.__typename)) ? alerts : wide).push(a);
+  }
+  return { alerts, wide };
 }
 
 /*
@@ -667,6 +734,8 @@ const ROUTE_ICON = `<svg viewBox="0 0 24 12" width="22" height="11" aria-hidden=
 
 // ikon for bestillingstur: telefonrør
 const PHONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.3 1z"/></svg>`;
+// ikon for avviksmelding: varseltrekant
+const ALERT_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2.5 1.5 21h21L12 2.5zm-1 6.5h2v6h-2V9zm0 8h2v2h-2v-2z"/></svg>`;
 // telefonnumre (8 sifre, med eller uten mellomrom og +47) og e-post i merknadene blir lenker
 const linkify = html => html
   .replace(/(\+47\s?)?(?<!\d\.?)\d(?:\s?\d){7}(?!\.?\d)/g, m => `<a href="tel:+47${m.replace(/\D/g, "").slice(-8)}">${m}</a>`)
@@ -717,6 +786,7 @@ class Board {
     this.heads = document.getElementById("heads");
     this.btn = document.getElementById("tonow");
     this.L = new Map(); this.R = new Map();
+    this.wide = new Map();   // avviksmeldinger for hele sambandet
     this.loadedFrom = 0; this.loadedTo = 0;
     this.backPromise = null; this.fwdPromise = null;   // pågående henting bakover/fremover
     this.backExhausted = false; this.fwdExhausted = false;
@@ -736,7 +806,7 @@ class Board {
     this.rowsEl.addEventListener("click", e => {
       const b = e.target.closest(".stopsbtn");
       if (b) { e.stopPropagation(); this.showStops(b); }
-      const n = e.target.closest(".notebtn");
+      const n = e.target.closest(".notebtn, .alertbtn");
       if (n) { e.stopPropagation(); this.showNotes(n); }
     });
     document.addEventListener("click", e => { if (!this.pop.contains(e.target)) this.hideStops(); });
@@ -750,12 +820,13 @@ class Board {
       fetchCalls(this.left, this.right, start, range),
       fetchCalls(this.right, this.left, start, range),
     ]);
-    return { l, r };
+    return { l: l.deps, r: r.deps, wide: [...l.wide, ...r.wide] };
   }
 
-  merge({ l, r }) {
+  merge({ l, r, wide = [] }) {
     for (const d of l) this.L.set(d.key, d);
     for (const d of r) this.R.set(d.key, d);
+    for (const a of wide) this.wide.set(a.id, a);
   }
 
   async init() {
@@ -765,7 +836,7 @@ class Board {
     // vis lagrede avganger med en gang (raskt, og virker uten nett), og hent ferske etterpå
     const cached = readCache(this.left, this.right);
     if (cached) {
-      this.merge({ l: cached.L, r: cached.R });
+      this.merge({ l: cached.L, r: cached.R, wide: cached.wide });
       this.render();
       this.scrollToNow(false);
     } else {
@@ -773,7 +844,7 @@ class Board {
     }
     try {
       const fresh = await this.fetchWindow(this.loadedFrom, this.loadedTo - this.loadedFrom);
-      this.L.clear(); this.R.clear();   // ferske data erstatter de lagrede
+      this.L.clear(); this.R.clear(); this.wide.clear();   // ferske data erstatter de lagrede
       this.merge(fresh);
       if (cached) this.renderKeepingPosition();
       else { this.render(); this.scrollToNow(false); }
@@ -794,7 +865,8 @@ class Board {
     const keep = d => d.aimed >= now - CACHE_BACK && d.aimed <= now + CACHE_FORWARD;
     const place = ({ id, name }) => ({ id, name });   // navnene trengs for å åpne sambandet uten nett
     writeCache(this.left, this.right, { savedAt: now, left: place(this.left), right: place(this.right),
-                                        L: [...this.L.values()].filter(keep), R: [...this.R.values()].filter(keep) });
+                                        L: [...this.L.values()].filter(keep), R: [...this.R.values()].filter(keep),
+                                        wide: [...this.wide.values()] });
     this.offlineUntil = 0;
     setOffline(null);
   }
@@ -851,6 +923,7 @@ class Board {
 
     frag.append(loaderRow("bottom", this.fwdExhausted ? "Ingen flere avganger" : "Dra opp for flere avganger"));
     this.rowsEl.replaceChildren(frag);
+    this.renderWide();
   }
 
   cell(d, now, nextKey) {
@@ -884,9 +957,14 @@ class Board {
     const note = notes.length
       ? `<button type="button" class="notebtn" data-key="${esc(d.key)}" title="${esc(notes.join("\n"))}" aria-label="Må bestilles: ${esc(notes.join(" "))}">${PHONE_ICON}</button>`
       : "";
+    // avviksmelding for avgangen: varselikon, og teksten vises når man trykker på det
+    const alerts = d.alerts ?? [];
+    const alert = alerts.length
+      ? `<button type="button" class="alertbtn" data-key="${esc(d.key)}" title="${esc(alerts.map(a => a.text).join("\n"))}" aria-label="Avvik: ${esc(alerts.map(a => a.text).join(" "))}">${ALERT_ICON}</button>`
+      : "";
     c.innerHTML =
       `<span class="t">${delayed ? `<span class="old">${hhmm(d.aimed)}</span>` : ""}${hhmm(shown)}</span>` +
-      note + tag + via + vname +
+      alert + note + tag + via + vname +
       `<span class="until">${past || d.cancelled ? "" : until(shown)}</span>`;
     return c;
   }
@@ -906,13 +984,19 @@ class Board {
   /* Viser merknadene om bestilling i samme boks, med telefonnumrene som lenker */
   showNotes(btn) {
     const d = this.L.get(btn.dataset.key) ?? this.R.get(btn.dataset.key);
-    if (!d?.notes?.length) return;
-    const id = "notes " + d.key;
+    const alert = btn.classList.contains("alertbtn");
+    const texts = alert ? (d?.alerts ?? []).map(a => a.text) : (d?.notes ?? []);
+    if (!texts.length) return;
+    this.showText(btn, `Fra ${d.from} ${hhmm(d.aimed)}`, texts, (alert ? "alerts " : "notes ") + d.key);
+  }
+
+  /* Tekster i boksen, med telefonnumre og e-post som lenker. Trykk igjen lukker den. */
+  showText(anchor, head, texts, id) {
     if (!this.pop.hidden && this.pop.dataset.key === id) { this.hideStops(); return; }
     this.pop.dataset.key = id;
-    this.pop.innerHTML = `<div class="sp-head">Fra ${esc(d.from)} ${hhmm(d.aimed)}</div>` +
-      d.notes.map(t => `<div class="sp-note">${linkify(esc(t))}</div>`).join("");
-    this.placePop(btn);
+    this.pop.innerHTML = `<div class="sp-head">${esc(head)}</div>` +
+      texts.map(t => `<div class="sp-note">${linkify(esc(t))}</div>`).join("");
+    this.placePop(anchor);
   }
 
   /* Vis boksen under (eller over) elementet den hører til */
@@ -1062,9 +1146,27 @@ class Board {
         if (d.aimed >= start + HOUR && d.aimed < start + range - HOUR && !keys.has(k)) map.delete(k);
       }
     }
+    // meldingene for sambandet følger med avgangene rundt nå, så de nye erstatter de gamle
+    this.wide.clear();
     this.merge(fresh);
     this.renderKeepingPosition();
     this.saveCache();
+  }
+
+  /* Avviksmeldinger for hele sambandet: en stripe øverst i bildet, trykk viser hele teksten */
+  renderWide() {
+    const now = Date.now();
+    // bare meldinger som gjelder nå (sanntidsoppdateringen henter dem på nytt hvert minutt)
+    const list = [...this.wide.values()].filter(a => (!a.start || a.start <= now) && (!a.end || a.end > now));
+    const el = document.getElementById("alertBar");
+    el.hidden = !list.length;
+    if (!list.length) return;
+    el.querySelector(".ab-icon").innerHTML = ALERT_ICON;
+    // generelle overskrifter («Trafikkmelding», «Ruteinfo:») sier lite, da vises selve meldingen
+    const [summary, description] = list[0].text.split("\n");
+    const first = description && /^(trafikkmelding|ruteinfo|melding|info(rmasjon)?)\W*$/i.test(summary) ? description : summary;
+    el.querySelector(".ab-text").textContent = first + (list.length > 1 ? ` (+${list.length - 1})` : "");
+    el.onclick = e => { e.stopPropagation(); this.showText(el, "Melding for sambandet", list.map(a => a.text), "wide"); };
   }
 }
 

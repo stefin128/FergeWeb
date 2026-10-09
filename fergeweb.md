@@ -110,6 +110,14 @@ På samband med flere ferger (f.eks. Moss–Horten) kan visningen velges i ⚙-d
 - **Behovsanløp** («Sørnes behovsanløp. Meldes på sambandets telefon …») vises bare når stoppet er en av de to kaiene i sambandet. Merknader om andre stopp på turen vises ikke.
 - Per oktober 2026 har rundt 20 bilferjelinjer bestillingsturer, og nesten alle bestilles på telefon til fergen eller operatøren.
 
+### Avviksmeldinger
+- Entur har avviksmeldinger fra rederiene i fritekst, for eksempel innstilling på grunn av vær, forsinkelser, redusert kapasitet, ekstraturer og bytte av ferge. Appen viser dem på to måter:
+- **For én avgang:** et rødt **varselikon** ved klokkeslettet. Trykker man på ikonet, vises meldingen, for eksempel «Innstilt – Bestilling ikke mottatt.». Gjelder meldingen en innstilt avgang, vises også «Innstilt» som før.
+- **For hele sambandet:** en rød **stripe øverst i bildet** med første linje av meldingen, og «(+2)» hvis det er flere. Trykker man på stripen, vises alle meldingene. Stripen vises bare mens meldingen gjelder. Er overskriften generell («Trafikkmelding», «Ruteinfo:»), står selve meldingen i stripen.
+- Meldinger knyttet til en tur (`AffectedServiceJourney`, `AffectedStopPlaceOnServiceJourney`) gjelder avgangen. Meldinger knyttet til linjen eller en kai på linjen gjelder sambandet.
+- Entur legger meldingen på avgangen først når den begynner å gjelde. Turens egne meldinger hentes derfor også, og de tas med når gyldighetsperioden overlapper avgangen. Da vises for eksempel en innstilling i kveld allerede nå.
+- Meldingene oppdateres med sanntiden hvert minutt, og lagres sammen med avgangene for bruk uten nett.
+
 ### Oppsett
 - Bildet ligger øverst, og de to kolonnene står side om side i én felles liste under. Dette er det eneste oppsettet og er ikke valgbart.
 - På brede skjermer begrenses bredden (maks ca. 980 px), og innholdet sentreres.
