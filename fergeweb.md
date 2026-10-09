@@ -103,6 +103,13 @@ På samband med flere ferger (f.eks. Moss–Horten) kan visningen velges i ⚙-d
 - Ankomsttid vises ikke.
 - Sanntid oppdateres hvert minutt, og når siden blir synlig igjen etter å ha vært i bakgrunnen.
 
+### Bestillingsturer
+- Avganger som må bestilles på forhånd, får et **telefonikon** ved klokkeslettet. Det gjelder for eksempel de tidligste avgangene lørdag og søndag på Misten–Festvåg.
+- Trykker man på ikonet, vises merknaden fra Entur, for eksempel «Bestillingstur. Bestilles på skipets tlf. innen kl 23:00 …». Telefonnumre og e-postadresser i teksten er lenker, så man kan ringe direkte fra mobilen.
+- Entur har ingen egne felt for bestilling på fergene, bare merknader i fritekst. Appen henter merknadene på avgangen, på ankomstkaien og på turen, og viser dem som handler om bestilling: «bestillingstur», «må bestilles», «førehandstinging», «på signal», «ved behov», «meldes» og lignende. Andre merknader, som «A-rute» eller «Billetter kjøpes ombord», vises ikke.
+- **Behovsanløp** («Sørnes behovsanløp. Meldes på sambandets telefon …») vises bare når stoppet er en av de to kaiene i sambandet. Merknader om andre stopp på turen vises ikke.
+- Per oktober 2026 har rundt 20 bilferjelinjer bestillingsturer, og nesten alle bestilles på telefon til fergen eller operatøren.
+
 ### Oppsett
 - Bildet ligger øverst, og de to kolonnene står side om side i én felles liste under. Dette er det eneste oppsettet og er ikke valgbart.
 - På brede skjermer begrenses bredden (maks ca. 980 px), og innholdet sentreres.

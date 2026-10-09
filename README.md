@@ -5,6 +5,7 @@ Fergetider for norske bilferjesamband i en enkel webapp. Standard er Misten – 
 - Avganger fra begge sider vises side om side. Hver avgang står på samme linje som returen.
 - Listen starter ved neste avgang. Dra opp for senere avganger, dra ned for tidligere.
 - Sanntid fra Entur oppdateres hvert minutt. Forsinkelser på minst 5 minutter og innstilte avganger vises.
+- Avganger som må bestilles, for eksempel tidlige helgeavganger, har et telefonikon. Trykk på det for å se hvordan turen bestilles.
 - Fergen vises i bildet der den antas å være akkurat nå..
 
 ## Bruk
