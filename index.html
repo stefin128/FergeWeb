@@ -189,7 +189,16 @@
     border: 0; border-radius: 6px; background: transparent; color: var(--accent); align-self: center;
   }
   .stopsbtn:hover, .stopsbtn:focus-visible { background: color-mix(in srgb, var(--accent) 15%, transparent); }
-  .cell.past .via, .cell.past .stopsbtn { color: var(--past); }
+  .cell.past .via, .cell.past .stopsbtn, .cell.past .notebtn { color: var(--past); }
+  /* bestillingstur: telefonikon ved klokkeslettet */
+  .notebtn {
+    display: inline-flex; align-items: center; padding: 3px; margin: 0 -4px; cursor: pointer; align-self: center;
+    border: 0; border-radius: 6px; background: transparent; color: var(--delay);
+  }
+  .notebtn:hover, .notebtn:focus-visible { background: color-mix(in srgb, var(--delay) 15%, transparent); }
+  .stopspop .sp-note { max-width: 300px; margin-top: 4px; font-variant-numeric: normal; }
+  .stopspop .sp-note + .sp-note { margin-top: 8px; }
+  .stopspop .sp-note a { color: var(--accent); font-weight: 600; white-space: nowrap; }
   .stopspop {
     position: fixed; z-index: 10; min-width: 170px; max-width: calc(100vw - 16px); padding: 8px 12px;
     background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
@@ -469,7 +478,7 @@ const VESSELS = {
 };
 
 // Versjon: antall commits og dato. Oppdateres automatisk ved hver commit av .githooks/pre-commit.
-const VERSION = { number: 17, date: "2026-10-08" };
+const VERSION = { number: 18, date: "2026-10-09" };
 
 const API = "https://api.entur.io/journey-planner/v3/graphql";
 const CLIENT_NAME = "softstone42-fergeweb";
@@ -503,8 +512,10 @@ query($id: String!, $start: DateTime!, $range: Int!) {
       expectedDepartureTime
       realtime
       cancellation
+      notices { text }
       serviceJourney {
         id
+        notices { text }
         journeyPattern { line { id publicCode transportMode transportSubmode } }
       }
       serviceJourneyEstimatedCalls {
@@ -512,6 +523,7 @@ query($id: String!, $start: DateTime!, $range: Int!) {
           quay { stopPlace { id name parent { id name } } }
           aimedArrivalTime
           expectedArrivalTime
+          notices { text }
         }
       }
     }
@@ -564,6 +576,8 @@ function toDeparture(c, from, to) {
     lineId: line.id,
     sj: c.serviceJourney.id,
     from: from.name,
+    // merknader om at turen, eller en av kaiene, må bestilles på forhånd
+    notes: bookingNotes(c, arr, from, to),
     // alle stopp videre på turen, med rutetid
     stops: c.serviceJourneyEstimatedCalls.next.map(n => ({
       name: shortName((n.quay.stopPlace.parent ?? n.quay.stopPlace).name),
@@ -571,6 +585,30 @@ function toDeparture(c, from, to) {
       target: isStop(n.quay.stopPlace, to.id),
     })),
   };
+}
+
+/*
+ * Bestillingsturer: Entur har ingen egne felt for dette på fergene, bare merknader i fritekst
+ * («Bestillingstur. Bestilles på tlf. …», «Mot førehandstinging …», «Sørnes behovsanløp. Meldes …»).
+ * Merknader på avgangs- eller ankomstkaien gjelder alltid. Merknader på turen kan gjelde et annet stopp
+ * («Sleneset ved behov»), og de tas bare med hvis setningen om stoppet nevner en av de to kaiene.
+ */
+const BOOKING_RE = /bestill|tinga|tinging|på signal|signalanløp|behov|meldes|må ringe|må kontakte|kontakte? (fergen|ferja|ferga|fartøyet)|ring fartøy|on request|on order|when ordered/i;
+const NOT_BOOKING_RE = /behov for assistanse/i;
+// setninger som gjelder bestemte stopp
+const STOP_RE = /ved behov|på behov|behovsanløp|signalanløp|anløp|på bestilling|prioritet|\bfr[aå] \p{Lu}|reisende|reisande/iu;
+
+function bookingNotes(c, arr, from, to) {
+  const texts = list => (list ?? []).map(n => n.text?.trim()).filter(Boolean);
+  const own = new Set([...texts(c.notices), ...texts(arr.notices)]);
+  const names = [from.name, to.name].map(n => new RegExp(`(^|[^\\p{L}])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}])`, "iu"));
+  return [...new Set([...own, ...texts(c.serviceJourney?.notices)])].filter(t => {
+    if (!BOOKING_RE.test(t) || NOT_BOOKING_RE.test(t)) return false;
+    if (own.has(t)) return true;
+    // «innen avgang frå Gjermundshamn» er en frist, ikke et stopp merknaden gjelder
+    const scoped = t.replace(/(avgang|ankomst) (fr[aå] )?\p{Lu}\p{L}*/gu, "").split(/[.:]\s+|\s\/\s/).filter(s => STOP_RE.test(s));
+    return !scoped.length || scoped.some(s => names.some(re => re.test(s)));
+  });
 }
 
 /*
@@ -626,6 +664,13 @@ function until(ms) {
 const esc = t => String(t).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 // ikon for "alle stopp": tre stopp på en linje
 const ROUTE_ICON = `<svg viewBox="0 0 24 12" width="22" height="11" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="1.6"/><circle cx="3.5" cy="6" r="2.6" fill="currentColor"/><circle cx="12" cy="6" r="2.6" fill="var(--panel)" stroke="currentColor" stroke-width="1.6"/><circle cx="20.5" cy="6" r="2.6" fill="currentColor"/></svg>`;
+
+// ikon for bestillingstur: telefonrør
+const PHONE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.3 1z"/></svg>`;
+// telefonnumre (8 sifre, med eller uten mellomrom og +47) og e-post i merknadene blir lenker
+const linkify = html => html
+  .replace(/(\+47\s?)?(?<!\d\.?)\d(?:\s?\d){7}(?!\.?\d)/g, m => `<a href="tel:+47${m.replace(/\D/g, "").slice(-8)}">${m}</a>`)
+  .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, m => `<a href="mailto:${m}">${m}</a>`);
 
 const isPast = (d, now) => Math.max(d.expected, d.aimed) < now - 60e3;
 
@@ -691,6 +736,8 @@ class Board {
     this.rowsEl.addEventListener("click", e => {
       const b = e.target.closest(".stopsbtn");
       if (b) { e.stopPropagation(); this.showStops(b); }
+      const n = e.target.closest(".notebtn");
+      if (n) { e.stopPropagation(); this.showNotes(n); }
     });
     document.addEventListener("click", e => { if (!this.pop.contains(e.target)) this.hideStops(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape") this.hideStops(); });
@@ -832,9 +879,14 @@ class Board {
     const ongoing = d.expected - 10 * 60e3 <= now && now <= d.arrival + 5 * 60e3;
     const vessel = multiHas("D") && ongoing && [...(this.vehicles?.values() ?? [])].find(v => v.sj === d.sj && now - v.updated < VEHICLE_MAX_AGE);
     const vname = vessel && VESSELS[vessel.id] ? `<span class="vname">${esc(VESSELS[vessel.id])}</span>` : "";
+    // bestillingstur: telefonikon, og merknaden vises når man trykker på det
+    const notes = d.notes ?? [];
+    const note = notes.length
+      ? `<button type="button" class="notebtn" data-key="${esc(d.key)}" title="${esc(notes.join("\n"))}" aria-label="Må bestilles: ${esc(notes.join(" "))}">${PHONE_ICON}</button>`
+      : "";
     c.innerHTML =
       `<span class="t">${delayed ? `<span class="old">${hhmm(d.aimed)}</span>` : ""}${hhmm(shown)}</span>` +
-      tag + via + vname +
+      note + tag + via + vname +
       `<span class="until">${past || d.cancelled ? "" : until(shown)}</span>`;
     return c;
   }
@@ -848,6 +900,18 @@ class Board {
     this.pop.innerHTML =
       `<div class="sp-head">Fra ${esc(d.from)} ${hhmm(d.aimed)}</div>` +
       d.stops.map(x => `<div class="sp-stop${x.target ? " target" : ""}"><span>${hhmm(x.time)}</span>${esc(x.name)}</div>`).join("");
+    this.placePop(btn);
+  }
+
+  /* Viser merknadene om bestilling i samme boks, med telefonnumrene som lenker */
+  showNotes(btn) {
+    const d = this.L.get(btn.dataset.key) ?? this.R.get(btn.dataset.key);
+    if (!d?.notes?.length) return;
+    const id = "notes " + d.key;
+    if (!this.pop.hidden && this.pop.dataset.key === id) { this.hideStops(); return; }
+    this.pop.dataset.key = id;
+    this.pop.innerHTML = `<div class="sp-head">Fra ${esc(d.from)} ${hhmm(d.aimed)}</div>` +
+      d.notes.map(t => `<div class="sp-note">${linkify(esc(t))}</div>`).join("");
     this.placePop(btn);
   }
 
